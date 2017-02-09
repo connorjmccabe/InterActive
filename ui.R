@@ -3,7 +3,6 @@
 require(foreign)
 require(shinyjs)
 require(pander)
-source("helpers.R") #read in helper functions et al.
 
 
 shinyUI(fluidPage(
