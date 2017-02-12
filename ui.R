@@ -1,7 +1,7 @@
 #OLS VERSION
 # ui.R
 require(foreign)
-require(shinyjs)
+# require(shinyjs)
 require(pander)
 
 

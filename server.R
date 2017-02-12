@@ -13,7 +13,7 @@ require(pscl)
 require(grDevices)
 require(Hmisc)
 require(quantmod)
-require(shinyjs)
+# require(shinyjs)
 require(pander)
 
 
