@@ -1,264 +1,8 @@
 options(digits=9)
 options(shiny.maxRequestSize=20*1024^2) #max file size = 20 MB
 # server.R
-require(ggplot2)
-require(QuantPsyc)
-# require(plyr)
-require(gridExtra)
-require(stats)
-require(MASS)
-require(RColorBrewer)
-require(foreign)
-require(pscl)
-require(grDevices)
-require(Hmisc)
-require(quantmod)
-# require(shinyjs)
-require(pander)
-
 
 # HELPER FUNCTIONS --------------------------------------------------------
-
-cfMake <- function(formula=NULL,data,nscen=1,names=NULL,hull=FALSE,f="mean",...) {
-  if (!is.null(formula)) {
-    #resploc <- attr(terms(formula),"response")
-    #data <- data[,all.vars(formula)[-resploc]]
-    data <- data[,all.vars(formula)]
-  }
-  data <- na.omit(data)
-  xmean <- apply(data,2,f,...)
-  xscen <- list(x=NULL,xpre=NULL)
-  xscen$x <- as.data.frame(matrix(data=xmean,nrow=nscen,ncol=ncol(data),byrow=TRUE))
-  xscen$xpre <- xscen$x
-  colnames(xscen$x) <- names(data)
-  colnames(xscen$xpre) <- names(data)
-  if (!is.null(names)) {
-    row.names(xscen$x) <- names
-    row.names(xscen$xpre) <- names
-  }
-  if (!is.null(formula)) {
-
-    # Get terms attribute
-    tl <- attributes(terms(formula))$term.labels
-
-    # Loop over terms
-    for (i in 1:length(tl)) {
-      tlCur <- tl[i]
-
-      # Check for logitBound transformations
-      if (substr(tlCur,1,11)=="logitBound(") {
-        # if found, check number of terms needed.
-        varname <- substr(tlCur,start=12,stop=nchar(tlCur)-1)
-        subform <- as.formula(paste("~",varname,"-1"))
-        toLT <- as.vector(model.matrix(subform,data=data))
-        testLT <- as.matrix(logitBound(toLT))
-
-        # revise formula so logitBound() call includes "forceAny" and/or "forceAll" as needed
-        if (any(colnames(testLT)=="any")) {
-          tlCur <- paste(substr(tlCur,start=1,stop=nchar(tlCur)-1), ", forceAny=TRUE)",sep="")
-        }
-        if (any(colnames(testLT)=="all")) {
-          print(testLT)
-          tlCur <- paste(substr(tlCur,start=1,stop=nchar(tlCur)-1), ", forceAll=TRUE)",sep="")
-        }
-        tl[i] <- tlCur
-        rhs <- paste(tl, collapse = " + ")
-        newform <- as.formula(paste("lhs ~", rhs), env=.GlobalEnv)
-        newform[[2L]] <- formula[[2L]]
-        formula <- newform
-      }
-
-      # Check for logBound transformations
-      if (substr(tlCur,1,9)=="logBound(") {
-        # if found, check number of terms needed.
-        varname <- substr(tlCur,start=10,stop=nchar(tlCur)-1)
-        subform <- as.formula(paste("~",varname,"-1"))
-        toLT <- as.vector(model.matrix(subform,data=data))
-        testLT <- as.matrix(logitBound(toLT))
-        # revise formula so logBound() call includes "forceAny" as needed
-        if (any(colnames(testLT)=="any")) {
-          tlCur <- paste(substr(tlCur,start=1,stop=nchar(tlCur)-1), ", forceAny=TRUE)",sep="")
-        }
-        tl[i] <- tlCur
-        rhs <- paste(tl, collapse = " + ")
-        newform <- as.formula(paste("lhs ~", rhs), env=.GlobalEnv)
-        newform[[2L]] <- formula[[2L]]
-        formula <- newform
-      }
-    }
-
-    xscen$model <- formula
-  }
-  class(xscen) <- c("list","counterfactual")
-
-  # Check for extrapolation
-  if (hull&&(!is.null(formula))&&(!is.null(data))) {
-    require(WhatIf)
-    wi <- whatif(formula=formula, data=data, cfact=xscen$x)
-    xscen$extrapolatex <- !wi$in.hull
-    wi <- whatif(formula=formula, data=data, cfact=xscen$xpre)
-    xscen$extrapolatexpre <- !wi$in.hull
-    xscen$extrapolatefd <- xscen$extrapolatex|xscen$extrapolatexpre
-    xscen$data <- data
-    if (any(c(xscen$extrapolatex,xscen$extrapolatexpre,xscen$extrapolatefd)==FALSE)) {
-      warning("Some counterfactuals involve extrapolation outside the convex hull")
-      if (any(xscen$extrapolatex==FALSE)) {
-        print(c("x scenarios:  ",row.names(x)[xscen$extrapolatex]))
-      }
-      if (any(xscen$extrapolatexpre==FALSE)) {
-        print(c("xpre scenarios:  ",row.names(xpre)[xscen$extrapolatexpre]))
-      }
-      if (any(xscen$extrapolatefd==FALSE)) {
-        print(c("first diff scenarios:  ",row.names(x)[xscen$extrapolatefd]))
-      }
-    }
-  }
-
-  xscen
-}
-
-cfChange <- function(xscen,covname,x=NULL,xpre=NULL,scen=1) {
-  if (!is.null(x))
-    xscen$x[scen,covname] <- x
-  if (!is.null(xpre))
-    xscen$xpre[scen,covname] <- xpre
-  if (!is.null(xscen$extrapolatex)) {
-    require(WhatIf)
-    wi <- whatif(formula=xscen$model, data=xscen$data, cfact=xscen$x)
-    xscen$extrapolatex <- !wi$in.hull
-    wi <- whatif(formula=xscen$model, data=xscen$data, cfact=xscen$xpre)
-    xscen$extrapolatexpre <- !wi$in.hull
-    xscen$extrapolatefd <- xscen$extrapolatex|xscen$extrapolatexpre
-    if (any(c(xscen$extrapolatex,xscen$extrapolatexpre,xscen$extrapolatefd)==FALSE)) {
-      warning("Some counterfactuals involve extrapolation outside the convex hull")
-      if (any(xscen$extrapolatex==FALSE)) {
-        print(c("x scenarios:  ",row.names(x)[xscen$extrapolatex]))
-      }
-      if (any(xscen$extrapolatexpre==FALSE)) {
-        print(c("xpre scenarios:  ",row.names(xpre)[xscen$extrapolatexpre]))
-      }
-      if (any(xscen$extrapolatefd==FALSE)) {
-        print(c("first diff scenarios:  ",row.names(x)[xscen$extrapolatefd]))
-      }
-    }
-
-  }
-
-  xscen
-}
-
-linearsimev <- function(x,b,ci=0.95,constant=1,sigma2=NULL,sims=10,save=FALSE,nscen=1) {
-  if (is.null(x)) {
-    if (is.na(constant))
-      stop("either x must be given, or a constant specified")
-    else
-      x <- matrix(1,nrow=nscen,ncol=1)
-  } else {
-    if (any(class(x)=="counterfactual")&&!is.null(x$model)) {
-      x <- model.matrix(x$model,x$x)
-    } else {
-      if (any(class(x)=="list")) x <- x$x
-      if (is.data.frame(x)) x <- as.matrix(x)
-      if (!is.matrix(x)) {
-        if (is.matrix(b)) {
-          x <- t(x)
-          if (!is.na(constant)) {
-            x <- append(x,1,constant-1)
-          }
-        } else {
-          x <- as.matrix(x)
-          if (!is.na(constant)) {
-            x <- appendmatrix(x,rep(1,nrow(x)),constant)
-          }
-        }
-      } else {
-        if (!is.na(constant)) {
-          x <- appendmatrix(x,rep(1,nrow(x)),constant)
-        }
-      }
-    }
-  }
-  esims <- nrow(as.matrix(b))
-
-  if (!is.null(sigma2)) {
-    predict <- TRUE
-    sigma <- sqrt(sigma2)
-  } else
-    predict <- FALSE
-
-  nscen <- nrow(x)
-  nci <- length(ci)
-  res <- list(pe = rep(NA, nscen),
-              lower = matrix(NA,nrow=nscen,ncol=nci),
-              upper = matrix(NA,nrow=nscen,ncol=nci))
-  if (predict) {
-    res$plower <- matrix(NA,nrow=nscen,ncol=nci)
-    res$pupper <- matrix(NA,nrow=nscen,ncol=nci)
-  }
-  if (save) {
-    res$ev <- matrix(NA,nrow=nscen,ncol=esims)
-    if (predict) {
-      res$pv <- matrix(NA,nrow=nscen,ncol=esims*sims)
-    }
-  }
-  for (i in 1:nscen) {
-    simmu <- b%*%x[i,]
-    if (save) res$ev[i,] <- simmu
-    res$pe[i] <- mean(simmu)
-    for (k in 1:nci) {
-      cint <- quantile(simmu,probs=c( (1-ci[k])/2, (1-(1-ci[k])/2) ) )
-      res$lower[i,k] <- cint[1]
-      res$upper[i,k] <- cint[2]
-    }
-
-    # Simulate predicted values if requested
-    if (predict) {
-      pv <- rnorm(sims*esims,mean=simmu,sd=sigma)
-      if (save)
-        res$pv[i,] <- pv
-      for (k in 1:nci) {
-        cint <- quantile(pv,probs=c( (1-ci[k])/2, (1-(1-ci[k])/2) ) )
-        res$plower[i,k] <- cint[1]
-        res$pupper[i,k] <- cint[2]
-      }
-    }
-  }
-  res$lower <- drop(res$lower)
-  res$upper <- drop(res$upper)
-  if (predict) {
-    res$plower <- drop(res$plower)
-    res$pupper <- drop(res$pupper)
-  }
-  res
-}
-
-probe.low.1sd<-function(MOD)
-{
-  low<-(MOD-mean(MOD,na.rm=TRUE))+sd(MOD, na.rm=TRUE)
-  return(low)
-}
-
-#At two standard deviations below:
-probe.low.2sd<-function(MOD)
-{
-  low<-(MOD-mean(MOD,na.rm=TRUE))+2*sd(MOD, na.rm=TRUE)
-  return(low)
-}
-
-#Below is a function for probing interactions at high levels of a moderator
-#by centering a the variable at one standard deviation below the mean.
-probe.high.1sd<-function(MOD)
-{
-  high<-(MOD-mean(MOD, na.rm=TRUE))-sd(MOD, na.rm=TRUE)
-  return(high)
-}
-
-#At two standard deviations above:
-probe.high.2sd<-function(MOD)
-{
-  high<-(MOD-mean(MOD, na.rm=TRUE))-2*sd(MOD, na.rm=TRUE)
-  return(high)
-}
 
 lighten <- function(col,
                     pct=0.75,
@@ -332,7 +76,6 @@ textInputRow<-function (inputId, label, value = "")
 
 # END HELPER FUNCTIONS ----------------------------------------------------
 
-
   function(input, output) {
     values<-reactiveValues() #defines empty list that will take model-produced values
     output$msg<-renderText({
@@ -372,9 +115,7 @@ output$ui.scale <- renderUI ({
                c("Raw" = "raw", "Centered" = "cen", "Standardized" = "std"),
                selected = "cen")
 })
-
-# GLM Family Options ------------------------------------------------------
-
+    
 # Building the model options ------------------------------------------
 
     output$ui.manual <- renderUI ({
@@ -407,7 +148,7 @@ output$ui.foc <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE) {textInput("foc", label = "Specify your focal (x-axis) variable:", value = "")}
+  if (input$manual==TRUE) {textInput("foc", label = "Specify your focal (x-axis) variable:", value = "", placeholder = "X")}
   else{
 
   selectInput("foc",
@@ -423,7 +164,7 @@ output$ui.mod <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE) {textInput("mod", label = "Specify your moderator (legend) variable:", value = "")}
+  if (input$manual==TRUE) {textInput("mod", label = "Specify your moderator (legend) variable:", value = "", placeholder = "Z")}
   else{
 
   selectInput("mod",
@@ -467,7 +208,7 @@ output$ui.formula <- renderUI ({
   if (input$manual==FALSE)
     return()
 
-  textAreaInput("manform", label = "Formula", value = "")
+  textAreaInput("manform", label = "Formula", value = "", placeholder = "Y ~ X + Z + X*Z")
 })
 
 # Define "go" button to run the model
@@ -522,6 +263,56 @@ output$ui.rosgo <- renderUI ({
 })
 
 observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all the ui input and runs the model.
+  
+  # Define small multiple moderator values
+  
+  output$ui.sm1<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    
+    textInput(inputId="sm1",
+              label="Multiple 1",
+              value= -2,
+              width = "80%")  
+  })
+  output$ui.sm2<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    
+    textInput(inputId="sm2",
+              label="Multiple 2",
+              value= -1,
+              width="80%")  
+  })
+  
+  output$ui.sm3<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    
+    textInput(inputId="sm3",
+              label="Mulitple 3",
+              value= 0,
+              width="80%")  
+  })
+  output$ui.sm4<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    
+    textInput(inputId="sm4",
+              label="Multiple 4",
+              value= 1,
+              width="80%")  
+  })
+  
+  output$ui.sm5<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    
+    textInput(inputId="sm5",
+              label="Multiple 5",
+              value= 2,
+              width="80%")  
+  })
   output$ui.downloadplot <- renderUI ({
     if (is.null(input$file1))
       return()
@@ -661,7 +452,8 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
 
   # DEFINE FOR STATIC PLOTS -------------------------------------------------
       if(input$manual == TRUE){
-        values$form2<-as.formula(gsub(mod, "s.mod", format(input$manform)))
+        formtemp<-as.formula(gsub(mod, "s.mod", format(input$manform)))
+        values$form2<-as.formula(gsub(foc, "s.foc", formtemp))
 
 values$model2<-values$form2
         }
@@ -669,17 +461,17 @@ values$model2<-values$form2
       cov<-paste(input$covars, collapse="+") #define covariate portion based on what the user specified
       if (input$poly == "quad"){ #if user selects a quadratic focal term, the below code will be run.
         focmod2<-paste("+",
-                       foc,"+",
-                       "I(",foc,"^2)","+", #Key difference: specifies an additonal quadratic term here.
+                       "s.foc","+",
+                       "I(","s.foc","^2)","+", #Key difference: specifies an additonal quadratic term here.
                        "s.mod","+",
-                       foc,"*",
+                       "s.foc","*",
                        "s.mod", "+",
-                       "I(",foc,"^2)","*", #Also specifies a quadratic interaction.
+                       "I(","s.foc","^2)","*", #Also specifies a quadratic interaction.
                        "s.mod")
       }
       else{
         #here, I paste together a formula based on user inputs for a standard linear model.
-        focmod2<-paste("+",foc,"+","s.mod","+",foc,"*","s.mod")
+        focmod2<-paste("+","s.foc","+","s.mod","+","s.foc","*","s.mod")
         } #Define all predictor terms
       dep2<-paste(input$dv, "~") # Define outcome variable
       }
@@ -705,19 +497,7 @@ values$model2<-values$form2
       values$model2<-as.formula(paste(dep2,cov,focmod2))
         }
 
-      data$s.mod <- probe.low.2sd(data[,mod])
-      m.2low<-lm(values$form2,data, na.action = na.omit)
-      data$s.mod <- probe.low.1sd(data[,mod])
-      m.1low<-lm(values$form2,data, na.action = na.omit)
-      data$s.mod <- data[,mod]
-      m.mean<-lm(values$form2,data, na.action = na.omit)
-      data$s.mod <- probe.high.1sd(data[,mod])
-      m.1high<-lm(values$form2,data, na.action = na.omit)
-      data$s.mod <- probe.high.2sd(data[,mod])
-      m.2high<-lm(values$form2,data, na.action = na.omit)
-
    }
-      data$s.mod <- data[,mod]
 
 # MAKING RoS PLOT ---------------------------------------------------------
 
@@ -784,47 +564,30 @@ values$rosplot<-rosplot
 
       if(input$static == FALSE) {
       #Begin new code for simulating estimates using simcf
-
-      m.pe<-mtrue$coefficients #specify coefficients
-      m.vcov<-vcov(mtrue) #specify variance-covariance matrix
-
-      #Define a sequence of counterfactuals across the range of observed values for my focal predictor. NOTE: this is potentially problematic because extreme scores can influence whether we are simulating across a range where there are minimal/no data points represented. I will work out a solution in a future iteration of this project.
-      focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
-
-      focal.hyp <-cfMake(values$form, dftrue, nscen = length(focal.seq)) #make counterfactuals
-      #
-      for (j in 1:length(focal.seq)){
-         for (l in 2:(length(all.vars(values$form)))){#This loop ensures we loop through all predictors in our model for however many the user specified (minus the intercept and interaction term).
-          focal.hyp <- cfChange(focal.hyp, all.vars(values$form)[l], x=mean(m$model[,l], na.rm = TRUE), scen=j) #Hold covariates at their mean
-          focal.hyp <- cfChange(focal.hyp, mod, x=modlevel, scen=j)#Based on user input, specify the value where my moderator will be held constant.
-          focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-         }
-      }
-      sims <- 10000
-      focal.hyp$model <- values$model
-
-      simparam <- mvrnorm(sims,m.pe,m.vcov) # draw parameters
-
-
-  # Define Dynamic Plot
-
-#Linear
-
-      simbetas <- simparam[,1:length(m.pe)]
-      focal.hyp.Ysims <- linearsimev(focal.hyp, simbetas, ci=.95)
-      # paste(focal.hyp$model)
-    #Now, we put the simulated values into a dataframe to be read in by ggplot2
-
-    df.plot<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims$pe, #point estimates
-      focal.hyp.Ysims$lower, #simulated lower limits
-      focal.hyp.Ysims$upper, #simulated upper limits
-
-      rep(summary(m)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-
-    #Add column names
-    colnames(df.plot)<-c("focal.seq","pe","lower","upper","p.val")
+        focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
+        df.plot<-as.data.frame(matrix(nrow = length(focal.seq),ncol=3))
+        for (j in 1:length(focal.seq)){
+          data$s.foc<-data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
+          data$s.mod<-data[,mod]-input$modlevel
+          lm<-lm(values$form2,data, na.action = na.omit)
+          df.plot$pe[j]<-lm$coefficients["(Intercept)"]
+          df.plot$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
+          df.plot$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
+          df.plot$pe[j]<-lm$coefficients["(Intercept)"]
+          df.plot$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
+          df.plot$focal.seq<-focal.seq
+        }
+        
+    # df.plot<-data.frame(
+    #   focal.seq, #focal hypothetical values
+    #   focal.hyp.Ysims$pe, #point estimates
+    #   focal.hyp.Ysims$lower, #simulated lower limits
+    #   focal.hyp.Ysims$upper, #simulated upper limits
+    # 
+    #   rep(summary(m)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
+    # 
+    # #Add column names
+    # colnames(df.plot)<-c("focal.seq","pe","lower","upper","p.val")
 
     #This looks up the color corresponding to the p-value associated with the PE of my focal predictor, and stores it in the dataframe for use in ggplot.
     df.plot$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
@@ -832,7 +595,7 @@ values$rosplot<-rosplot
     #Finally, I build the graphic using ggplot2, commented below:
     plot.lin <- ggplot() +
 
-      geom_point(data=dfpoints, aes(pred,fitted),size = .75, alpha = .5) +
+      geom_point(data=dfpoints, aes(pred,y),size = .75, alpha = .5) +
 
       #Specifies confidence intervals referencing the lower and upper CI values
       geom_ribbon(data=df.plot, aes(x=focal.seq, y=pe, ymin = df.plot$lower, ymax = df.plot$upper, fill=df.plot$col), alpha = .25) +
@@ -909,48 +672,6 @@ else{
 # Define Static Plots ------------------------------------------------------
   if(input$cat==TRUE){
 
-      m.cat0.pe<-m.cat0$coefficients #specify coefficients
-      m.cat0.vcov<-vcov(m.cat0) #specify variance-covariance matrix
-
-      m.cat1.pe<-m.cat1$coefficients #specify coefficients
-      m.cat1.vcov<-vcov(m.cat1) #specify variance-covariance matrix
-
-
-    focal.seq <- seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1)
-    focal.hyp <-cfMake(values$form2, data, nscen = length(focal.seq)) #make counterfactuals
-    sims <- 10000
-    form2<-values$form2
-    focal.hyp$model <- values$model2
-    simparam.cat0 <- mvrnorm(sims,m.cat0.pe,m.cat0.vcov) # draw parameters
-    simparam.cat1 <- mvrnorm(sims,m.cat1.pe,m.cat1.vcov) # draw parameters
-
-    simbetas.cat0 <- simparam.cat0[,1:length(m.cat0.pe)]
-    simbetas.cat1 <- simparam.cat1[,1:length(m.cat1.pe)]
-
-    # Category 0 plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(form2)[l], x=mean(m.cat0$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=0, scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-      focal.hyp.Ysims.cat0 <- linearsimev(focal.hyp, simbetas.cat0, ci=.95)
-    # Category 1 plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(values$form2)[l], x=mean(m.cat1$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=0, scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-      focal.hyp.Ysims.cat1 <- linearsimev(focal.hyp, simbetas.cat1, ci=.95)
-
-
     # Create Static Plots
 
     #Create static plots for non-two-part models
@@ -1004,13 +725,6 @@ else{
 
       dfpoints$level <- factor(dfpoints$level, levels = c(paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3)),
                                                           paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))))
-
-      #This messes with my graphs to do, even though it works.
-      # dfpoints$level<-gsub("p = 0", "p < .001",dfpoints$level)
-      # df.staticplot$level<-gsub("p = 0", "p < .001",df.staticplot$level)
-      #
-      # dfpoints$resfoc<-lm(values$resfoc.form,m$model, na.action = na.omit)$fitted.values
-      # dfpoints$yres<-lm(values$resdv.form,m$model, na.action = na.omit)$fitted.values
 
       values$dfpoints<-dfpoints
 
@@ -1097,164 +811,50 @@ else{
   }
 else{
 
-    m.2low.pe<-m.2low$coefficients #specify coefficients
-    m.2low.vcov<-vcov(m.2low) #specify variance-covariance matrix
-
-    m.1low.pe<-m.1low$coefficients #specify coefficients
-    m.1low.vcov<-vcov(m.1low) #specify variance-covariance matrix
-
-    m.mean.pe<-m.mean$coefficients #specify coefficients
-    m.mean.vcov<-vcov(m.mean) #specify variance-covariance matrix
-
-    m.1high.pe<-m.1high$coefficients #specify coefficients
-    m.1high.vcov<-vcov(m.1high) #specify variance-covariance matrix
-
-    m.2high.pe<-m.2high$coefficients #specify coefficients
-    m.2high.vcov<-vcov(m.2high) #specify variance-covariance matrix
-
-  focal.seq <- seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1)
-  focal.hyp <-cfMake(values$form2, data, nscen = length(focal.seq)) #make counterfactuals
-  sims <- 10000
-  form2<-values$form2
-  focal.hyp$model <- values$model2
-  simparam.2low <- mvrnorm(sims,m.2low.pe,m.2low.vcov) # draw parameters
-  simparam.1low <- mvrnorm(sims,m.1low.pe,m.1low.vcov) # draw parameters
-  simparam.mean <- mvrnorm(sims,m.mean.pe,m.mean.vcov) # draw parameters
-  simparam.1high <- mvrnorm(sims,m.1high.pe,m.1high.vcov) # draw parameters
-  simparam.2high <- mvrnorm(sims,m.2high.pe,m.2high.vcov) # draw parameters
-
-  simbetas.2low <- simparam.2low[,1:length(m.2low.pe)]
-  simbetas.1low <- simparam.1low[,1:length(m.1low.pe)]
-  simbetas.mean <- simparam.mean[,1:length(m.mean.pe)]
-  simbetas.1high <- simparam.1high[,1:length(m.1high.pe)]
-  simbetas.2high <- simparam.2high[,1:length(m.2high.pe)]
-
-
-  # 2 SD below plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(form2)[l], x=mean(m.2low$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=mean(data$s.mod, na.rm = TRUE), scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-    focal.hyp.Ysims.2low <- linearsimev(focal.hyp, simbetas.2low, ci=.95)
-
-    # 1 SD below plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(values$form2)[l], x=mean(m.1low$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=mean(data$s.mod, na.rm = TRUE), scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-    focal.hyp.Ysims.1low <- linearsimev(focal.hyp, simbetas.1low, ci=.95)
-
-    # MEAN plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(values$form2)[l], x=mean(m.mean$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=mean(data$s.mod, na.rm = TRUE), scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-
-    focal.hyp.Ysims.mean <- linearsimev(focal.hyp, simbetas.mean, ci=.95)
-
-    # # 1 SD Above plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(values$form2)[l], x=mean(m.1high$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=mean(data$s.mod, na.rm = TRUE), scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-
-    focal.hyp.Ysims.1high <- linearsimev(focal.hyp, simbetas.1high, ci=.95)
-
-    # # 2 SD Above plot
-
-    for (j in 1:length(focal.seq)){
-      for (l in 2:(length(all.vars(values$form2)))){
-        focal.hyp <- cfChange(focal.hyp, all.vars(values$form2)[l], x=mean(m.2high$model[,l]), scen=j) #Hold covariates at their mean
-        focal.hyp <- cfChange(focal.hyp, "s.mod", x=mean(data$s.mod, na.rm = TRUE), scen=j)#Based on user input, specify the value where my moderator will be held constant.
-        focal.hyp <- cfChange(focal.hyp, foc, x=focal.seq[j], scen=j) #create scenarios for the jth counterfactual of my focal predictor.
-      }
-    }
-
-    focal.hyp.Ysims.2high <- linearsimev(focal.hyp, simbetas.2high, ci=.95)
-
-
 # Create Static Plots
 
 #SET UP DATA FRAMES
 
   #Create static plots for non-two-part models
 
-    df.plot.2low<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims.2low$pe, #point estimates
-      focal.hyp.Ysims.2low$lower, #simulated lower limits
-      focal.hyp.Ysims.2low$upper, #simulated upper limits
-      rep(paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3))),
-      rep(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    #Add column names
-    colnames(df.plot.2low)<-c("focal.seq","pe","lower","upper","level","p.val")
-    df.plot.2low$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
+  focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
+  mod.seq <- c(as.numeric(input$sm1),
+               as.numeric(input$sm2),
+               as.numeric(input$sm3),
+               as.numeric(input$sm4),
+               as.numeric(input$sm5))
+  modlevel<- list()
+  ppoints<-as.data.frame(matrix(nrow=length(focal.seq),ncol=3))
+  colnames(ppoints)<-c("pe","lower","upper")
+  for (k in 1:length(mod.seq)){
 
-    df.plot.1low<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims.1low$pe, #point estimates
-      focal.hyp.Ysims.1low$lower, #simulated lower limits
-      focal.hyp.Ysims.1low$upper, #simulated upper limits
-      rep(paste0("-1 SD\nBeta = ",round(lm.beta(m.1low)[foc],3),"\np = ",round(summary(m.1low)$coefficients[foc,"Pr(>|t|)"],3))),
-      rep(summary(m.1low)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    #Add column names
-    colnames(df.plot.1low)<-c("focal.seq","pe","lower","upper","level","p.val")
-    df.plot.1low$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.1low)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-    df.plot.mean<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims.mean$pe, #point estimates
-      focal.hyp.Ysims.mean$lower, #simulated lower limits
-      focal.hyp.Ysims.mean$upper, #simulated upper limits
-      rep(paste0("Mean\nBeta = ",round(lm.beta(m.mean)[foc],3),"\np = ",round(summary(m.mean)$coefficients[foc,"Pr(>|t|)"],3))),
-      rep(summary(m.mean)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    #Add column names
-    colnames(df.plot.mean)<-c("focal.seq","pe","lower","upper","level","p.val")
-    df.plot.mean$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.mean)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-    df.plot.1high<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims.1high$pe, #point estimates
-      focal.hyp.Ysims.1high$lower, #simulated lower limits
-      focal.hyp.Ysims.1high$upper, #simulated upper limits
-      rep(paste0("+1 SD\nBeta = ",round(lm.beta(m.1high)[foc],3),"\np = ",round(summary(m.1high)$coefficients[foc,"Pr(>|t|)"],3))),
-      rep(summary(m.1high)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    #Add column names
-    colnames(df.plot.1high)<-c("focal.seq","pe","lower","upper","level","p.val")
-    df.plot.1high$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.1high)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-    df.plot.2high<-data.frame(
-      focal.seq, #focal hypothetical values
-      focal.hyp.Ysims.2high$pe, #point estimates
-      focal.hyp.Ysims.2high$lower, #simulated lower limits
-      focal.hyp.Ysims.2high$upper, #simulated upper limits
-      rep(paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))),
-      rep(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    #Add column names
-    colnames(df.plot.2high)<-c("focal.seq","pe","lower","upper","level","p.val")
-    df.plot.2high$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-    df.staticplot<-as.data.frame(rbind(df.plot.2low,df.plot.1low,df.plot.mean,df.plot.1high,df.plot.2high))
+    data$s.mod<-data[,mod]-sd(data[,mod], na.rm=TRUE)*mod.seq[k]
+    for (j in 1:length(focal.seq)){
+      data$s.foc<-data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
+      
+      lm<-lm(values$form2,data, na.action = na.omit)
+      ppoints$pe[j]<-lm$coefficients["(Intercept)"]
+      ppoints$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
+      ppoints$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
+      ppoints$pe[j]<-lm$coefficients["(Intercept)"]
+      ppoints$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
+      ppoints$focal.seq<-focal.seq
+      leveltemp<-rep(paste0("B = ",
+                                round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
+                                round(confint(lm)["s.foc","2.5 %"],2),", ",
+                                round(confint(lm)["s.foc","97.5 %"],2),"]"))
+    }
+    ppoints$level<-paste0(mod.seq[k]," SD\n",leveltemp)
+    modlevel[[k]]<-ppoints
+  }
+  data$s.mod<-data[,mod]
+  data$s.foc<-data[,foc]
+  
+    df.staticplot<-as.data.frame(rbind(modlevel[[1]],
+                                       modlevel[[2]],
+                                       modlevel[[3]],
+                                       modlevel[[4]],
+                                       modlevel[[5]]))
 
     df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
     df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
@@ -1270,32 +870,32 @@ else{
 
     values$dfplot<-df.staticplot
 
-    dfpoints$p.val[scale(data[,mod])<=-1.5]<-round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3)
-    dfpoints$p.val[scale(data[,mod])< -0.5 & scale(data[,mod])>=-1.5] <-round(summary(m.1low)$coefficients[foc,"Pr(>|t|)"],3)
-    dfpoints$p.val[scale(data[,mod])<0.5 & scale(data[,mod])>=-0.5]<-round(summary(m.mean)$coefficients[foc,"Pr(>|t|)"],3)
-    dfpoints$p.val[scale(data[,mod])<1.5 & scale(data[,mod])>=0.5]<-round(summary(m.1high)$coefficients[foc,"Pr(>|t|)"],3)
-    dfpoints$p.val[scale(data[,mod])>=1.5]<-round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-round(modlevel[[1]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)] <-round(modlevel[[2]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5)]<-round(modlevel[[3]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5)]<-round(modlevel[[4]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5)]<-round(modlevel[[5]]$p.val[1],3)
 
-    dfpoints$level[scale(data[,mod])<=-1.5]<-paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3))
-    dfpoints$level[scale(data[,mod])< -0.5 & scale(data[,mod])>=-1.5]<-paste0("-1 SD\nBeta = ",round(lm.beta(m.1low)[foc],3),"\np = ",round(summary(m.1low)$coefficients[foc,"Pr(>|t|)"],3))
-    dfpoints$level[scale(data[,mod])<0.5 & scale(data[,mod])>=-0.5]<-paste0("Mean\nBeta = ",round(lm.beta(m.mean)[foc],3),"\np = ",round(summary(m.mean)$coefficients[foc,"Pr(>|t|)"],3))
-    dfpoints$level[scale(data[,mod])<1.5 & scale(data[,mod])>=0.5]<-paste0("+1 SD\nBeta = ",round(lm.beta(m.1high)[foc],3),"\np = ",round(summary(m.1high)$coefficients[foc,"Pr(>|t|)"],3))
-    dfpoints$level[scale(data[,mod])>=1.5]<-paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))
-
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-modlevel[[1]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-modlevel[[2]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5)]<-modlevel[[3]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5)]<-modlevel[[4]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5)]<-modlevel[[5]]$level[1]
+    
     dfpoints<-na.omit(dfpoints)
 
-    dfpoints$level <- factor(dfpoints$level, levels = c(paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3)),
-                                                        paste0("-1 SD\nBeta = ",round(lm.beta(m.1low)[foc],3),"\np = ",round(summary(m.1low)$coefficients[foc,"Pr(>|t|)"],3)),
-                                                        paste0("Mean\nBeta = ",round(lm.beta(m.mean)[foc],3),"\np = ",round(summary(m.mean)$coefficients[foc,"Pr(>|t|)"],3)),
-                                                        paste0("+1 SD\nBeta = ",round(lm.beta(m.1high)[foc],3),"\np = ",round(summary(m.1high)$coefficients[foc,"Pr(>|t|)"],3)),
-                                                        paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))))
-
-#This messes with my graphs to do, even though it works.
-    # dfpoints$level<-gsub("p = 0", "p < .001",dfpoints$level)
-    # df.staticplot$level<-gsub("p = 0", "p < .001",df.staticplot$level)
-    #
-    # dfpoints$resfoc<-lm(values$resfoc.form,m$model, na.action = na.omit)$fitted.values
-    # dfpoints$yres<-lm(values$resdv.form,m$model, na.action = na.omit)$fitted.values
+    dfpoints$level <- factor(dfpoints$level, levels = c(modlevel[[1]]$level[1],
+                                                        modlevel[[2]]$level[1],
+                                                        modlevel[[3]]$level[1],
+                                                        modlevel[[4]]$level[1],
+                                                        modlevel[[5]]$level[1]))
+    
+    df.staticplot$level <- factor(df.staticplot$level, levels = c(modlevel[[1]]$level[1],
+                                                        modlevel[[2]]$level[1],
+                                                        modlevel[[3]]$level[1],
+                                                        modlevel[[4]]$level[1],
+                                                        modlevel[[5]]$level[1]))
+    
 
     values$dfpoints<-dfpoints
 
@@ -1306,16 +906,6 @@ else{
     df.cols<-as.data.frame(df.cols)
     values$df.cols<-df.cols
     #
-    ####THIS IS THE CONTINOUS INTERACTION STATIC PLOT
-    #TEMPORARY: get rid of +-2 sd
-    # df.staticplot<-df.staticplot[which(df.staticplot$level!=paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))),]
-    # df.staticplot<-df.staticplot[which(df.staticplot$level!=paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3))),]
-    # dfpoints<-dfpoints[which(dfpoints$level!=paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))),]
-    # dfpoints<-dfpoints[which(dfpoints$level!=paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3))),]
-    #
-    # df.cols<-df.cols[which(df.cols$level!=paste0("+2 SD\nBeta = ",round(lm.beta(m.2high)[foc],3),"\np = ",round(summary(m.2high)$coefficients[foc,"Pr(>|t|)"],3))),]
-    # df.cols<-df.cols[which(df.cols$level!=paste0("-2 SD\nBeta = ",round(lm.beta(m.2low)[foc],3),"\np = ",round(summary(m.2low)$coefficients[foc,"Pr(>|t|)"],3))),]
-    # values$df.cols<-df.cols
 
     staticplot<-ggplot() +
 

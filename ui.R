@@ -6,7 +6,6 @@ require(pander)
 
 
 shinyUI(fluidPage(
-  useShinyjs(),
   titlePanel("InterActive: A tool for the quantitative display of interactions"),
 
   sidebarLayout(
@@ -38,8 +37,21 @@ shinyUI(fluidPage(
     mainPanel(em(h2(textOutput("msg"))),
       tabsetPanel(
       tabPanel("Plot",
-               # verbatimTextOutput("focal.hyp"),
-               column(8,
+               
+               column(7,
+                      fluidRow(
+                        column(2, align="center",
+                              ""),
+                        column(2, align="center",
+                              uiOutput("ui.sm1")),
+                        column(2, align="center",
+                              uiOutput("ui.sm2")),
+                        column(2, align="center",
+                              uiOutput("ui.sm3")),
+                        column(2, align="center",
+                              uiOutput("ui.sm4")),
+                        column(2, align="center",
+                              uiOutput("ui.sm5"))),
                       plotOutput("modplot"),
                       uiOutput("ui.static"),
                       uiOutput("ui.modlevel"),
