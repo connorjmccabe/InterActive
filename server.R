@@ -1,5 +1,6 @@
 options(digits=9)
 options(shiny.maxRequestSize=20*1024^2) #max file size = 20 MB
+require(ggplot2)
 # server.R
 
 # HELPER FUNCTIONS --------------------------------------------------------
@@ -870,17 +871,27 @@ else{
 
     values$dfplot<-df.staticplot
 
-    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-round(modlevel[[1]]$p.val[1],3)
-    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)] <-round(modlevel[[2]]$p.val[1],3)
-    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5)]<-round(modlevel[[3]]$p.val[1],3)
-    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5)]<-round(modlevel[[4]]$p.val[1],3)
-    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5)]<-round(modlevel[[5]]$p.val[1],3)
+    divides<-c(((as.numeric(input$sm2) - as.numeric(input$sm1))/2),
+               ((as.numeric(input$sm3) - as.numeric(input$sm2))/2),
+               ((as.numeric(input$sm4) - as.numeric(input$sm3))/2),
+               ((as.numeric(input$sm5) - as.numeric(input$sm4))/2))
+    divides<-abs(divides)
+               
+    values$divides<-divides
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-round(modlevel[[1]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])] <-round(modlevel[[2]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-round(modlevel[[3]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-round(modlevel[[4]]$p.val[1],3)
+    dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-round(modlevel[[5]]$p.val[1],3)
 
-    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-modlevel[[1]]$level[1]
-    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+.5)]<-modlevel[[2]]$level[1]
-    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+.5)]<-modlevel[[3]]$level[1]
-    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+.5)]<-modlevel[[4]]$level[1]
-    dfpoints$level[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+.5)]<-modlevel[[5]]$level[1]
+    #SM1
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modlevel[[1]]$level[1]
+    #get percentile rank
+    #SM2
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modlevel[[2]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-modlevel[[3]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-modlevel[[4]]$level[1]
+    dfpoints$level[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-modlevel[[5]]$level[1]
     
     dfpoints<-na.omit(dfpoints)
 
@@ -1061,7 +1072,8 @@ output$plotdata <- renderTable({
 output$test.tab <- renderText({
   if (is.null(input$file1))
     return(NULL)
-  paste(confint(values$m.repar)["C","2.5%"],confint(values$m.repar)["C","97.5%"])
+  # paste(confint(values$m.repar)["C","2.5%"],confint(values$m.repar)["C","97.5%"])
+  values$divides
   # values$df.plot
 
 })
