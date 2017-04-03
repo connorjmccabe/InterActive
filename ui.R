@@ -62,7 +62,7 @@ shinyUI(fluidPage(
                       tableOutput("results"),
                       textOutput("resultstitlecount"),
                       tableOutput("resultscount"),
-                      textOutput("test.tab"),
+                      # textOutput("test.tab"),
                       textOutput("co")
                )
                ),
