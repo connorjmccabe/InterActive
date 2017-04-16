@@ -372,6 +372,120 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
 
   # Reproduce Model Results -------------------------------------------------
 
+#DEFINE PLOT TEMPLATE FUNCTION
+    
+    interactiv.plot<-function(data, dfpoints, plotdf){
+      geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
+        geom_ribbon(data=plotdf, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
+        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=2) +
+        
+        ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
+        
+        #Similarly, define my x axis based on the minimum and maximum values observed in my data
+        xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
+        
+        #Manual specification of the RColorBrewer blue palette
+        
+        #thematic specifications of my graphic
+        theme(text=element_text(family="Times",size=15, color="black"),
+              legend.position="none",
+              panel.background = element_blank(),
+              legend.background = element_rect(fill = "white"),
+              legend.title=element_blank(),
+              legend.key = element_rect(fill = "white"),
+              panel.grid.minor = element_blank(),
+              axis.text.x=element_text(colour="black"),
+              axis.text.y=element_text(colour="black"),
+              axis.title.y=element_text(size=15),
+              panel.grid.major = element_line(colour="#C0C0C0"),
+              plot.background=element_rect(fill='white')) +
+        labs(fill = mod, color = mod, linetype=mod) +
+        
+        #These are labels based on the current data, but I will build this out to be more dynamic in the future, allowing users to specify their own axis and plot labels.
+        labs(x = foc, y = dv) +
+        
+        
+        coord_cartesian() +
+        
+        #Across the title, I provide the point estimate and p-value for the focal predictor at the given level of the moderator. Note that there are some minor rounding issues I need to fix that result in p-values equalling zero (not possible).
+        
+        ggtitle(paste0("Level of Moderator (",mod,")")) +
+        
+        #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
+        
+        geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
+        
+        facet_grid(~level) +
+        scale_color_manual(values=df.cols$col) +
+        #Define my fill reigion as lighter versions of the above
+        scale_fill_manual(values=df.cols$colslight) +
+        
+        # annotate("segment", x = confint(values$m.repar)["C","2.5%"],
+        #          xend = confint(values$m.repar)["C","97.5%"],
+        #          y = 50,
+        #          yend = 50,
+        #          colour = "black", linetype = "solid", size = 3) +
+        
+        theme(plot.title = element_text(family="Times", face="bold", size=15, hjust=0, color="black"))
+    }
+    
+    interactiv.plot2<-function(data, dfpoints, plotdf){
+      ggplot() +
+        
+        geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
+        geom_ribbon(data=plotdf, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
+        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=2) +
+        
+        ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
+        
+        #Similarly, define my x axis based on the minimum and maximum values observed in my data
+        xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
+        
+        #Manual specification of the RColorBrewer blue palette
+        
+        #thematic specifications of my graphic
+        theme(text=element_text(family="Times",size=15, color="black"),
+              legend.position="none",
+              panel.background = element_blank(),
+              legend.background = element_rect(fill = "white"),
+              legend.title=element_blank(),
+              legend.key = element_rect(fill = "white"),
+              panel.grid.minor = element_blank(),
+              axis.text.x=element_text(colour="black"),
+              axis.text.y=element_text(colour="black"),
+              axis.title.y=element_text(size=15),
+              panel.grid.major = element_line(colour="#C0C0C0"),
+              plot.background=element_rect(fill='white')) +
+        labs(fill = mod, color = mod, linetype=mod) +
+        
+        #These are labels based on the current data, but I will build this out to be more dynamic in the future, allowing users to specify their own axis and plot labels.
+        labs(x = foc, y = dv) +
+        
+        
+        coord_cartesian() +
+        
+        #Across the title, I provide the point estimate and p-value for the focal predictor at the given level of the moderator. Note that there are some minor rounding issues I need to fix that result in p-values equalling zero (not possible).
+        
+        ggtitle(paste0("Level of Moderator (",mod,")")) +
+        
+        #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
+        
+        geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
+        
+        facet_grid(~level) +
+        scale_color_manual(values=df.cols$col) +
+        #Define my fill reigion as lighter versions of the above
+        scale_fill_manual(values=df.cols$colslight) +
+        
+        # annotate("segment", x = confint(values$m.repar)["C","2.5%"],
+        #                     xend = confint(values$m.repar)["C","97.5%"],
+        #                     y = 50,
+        #                     yend = 50,
+        #                     colour = "black", linetype = "solid", size = 3) +
+        
+        theme(plot.title = element_text(family="Times", face="bold", size=15, hjust=0, color="black"))
+    }
+    
       data<-df() #pull in defined data
       dftrue<-df()
       mod <- input$mod #define moderator
@@ -538,11 +652,12 @@ hyp.Z <- seq(-3,3,.1)
         geom_hline(yintercept = 0) +
         # geom_vline(xintercept = max(ros.siglow), linetype="dashed") +
         # geom_vline(xintercept = max(ros.sighigh), linetype="dashed") +
-        xlab("Moderator") +
-        ylab("Simple Slope of\nFocal Predictor") +
+        xlab(mod) +
+        ylab(paste0("Simple Slope of\n",foc)) +
         geom_rug(data = df.ros, aes(x=df.ros[,mod])) +
         # geom_density(data = df.ros, aes(x=df.ros[,mod]), linetype = "dotted", fill=brewer.pal(3,"Greys")[2], alpha = .25, position = position_dodge(width = .2)) +
-        theme_bw()
+        theme_bw() +
+        theme(text=element_text(family="Times",size=15, color="black"))
 
 values$rosplot<-rosplot
 
@@ -578,89 +693,22 @@ values$rosplot<-rosplot
           df.plot$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
           df.plot$focal.seq<-focal.seq
         }
-        
-    # df.plot<-data.frame(
-    #   focal.seq, #focal hypothetical values
-    #   focal.hyp.Ysims$pe, #point estimates
-    #   focal.hyp.Ysims$lower, #simulated lower limits
-    #   focal.hyp.Ysims$upper, #simulated upper limits
-    # 
-    #   rep(summary(m)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-    # 
-    # #Add column names
-    # colnames(df.plot)<-c("focal.seq","pe","lower","upper","p.val")
 
     #This looks up the color corresponding to the p-value associated with the PE of my focal predictor, and stores it in the dataframe for use in ggplot.
     df.plot$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
 
     #Finally, I build the graphic using ggplot2, commented below:
-    plot.lin <- ggplot() +
-
-      geom_point(data=dfpoints, aes(pred,y),size = .75, alpha = .5) +
-
-      #Specifies confidence intervals referencing the lower and upper CI values
-      geom_ribbon(data=df.plot, aes(x=focal.seq, y=pe, ymin = df.plot$lower, ymax = df.plot$upper, fill=df.plot$col), alpha = .25) +
-
-      #Manual specification of the color. This looks up the color corresponding to the p-value associated with the PE of my focal predictor, and stores it in the dataframe for use in ggplot. I use the color (pcols) as the line color and a lightened version (pcolslight) for the confidence region shading.
-      scale_colour_manual(values=brewer.pal(5,"Blues")[5]) +
-      scale_fill_manual(values=lighten(brewer.pal(5,"Blues")[5])) +
-
-      #Include fit lines
-      geom_line(data = df.plot, aes(focal.seq, pe, fill=col, color=col), size=2) +
-
-      #Specify my y limits as the minimum and maximum observed in the data. Currently, this is just two standard deviations below and above my minimum and maximum observed Y values to allow for my confidence regions to be displayed. I intend on improving this in the future.
-
-  ylim(min(data[,dv]-2*sd(data[,dv], na.rm = TRUE)), max(data[,dv]+2*sd(data[,dv], na.rm = TRUE))) +
-xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
-
-      #thematic specifications of my graphic
-      theme(text=element_text(family="Trebuchet MS",size=15, color="black"),
-            legend.position="none",
-            panel.background = element_blank(),
-            legend.background = element_rect(fill = "white"),
-            legend.title=element_blank(),
-            legend.key = element_rect(fill = "white"),
-            panel.grid.minor = element_blank(),
-            axis.text.x=element_text(colour="black"),
-            axis.text.y=element_text(colour="black"),
-            axis.title.y=element_text(size=15),
-            panel.grid.major = element_line(colour="#C0C0C0"),
-            plot.background=element_rect(fill='white')) +
-      labs(fill = mod, color = mod, linetype=mod) +
-
-      #These are labels based on the current data, but I will build this out to be more dynamic in the future, allowing users to specify their own axis and plot labels.
-      labs(x = foc, y = dv) +
-      coord_cartesian() +
-
-      #Across the title, I provide the point estimate and p-value for the focal predictor at the given level of the moderator. Note that there are some minor rounding issues I need to fix that result in p-values equalling zero (not possible).
-      ggtitle(paste("Level of Moderator (",mod,") =", modlevel,"\n",foc," PE = ",round(summary(m)$coefficients[foc,"Estimate"],3), ", p = ",round(summary(m)$coefficients[foc,"Pr(>|t|)"],3))) +
-
-      #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
-
-      geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
-      theme(plot.title = element_text(family="Trebuchet MS", face="bold", size=15, hjust=0, color="black"))
-
-    #       {
-      # annotate("errorbarh", x = values$co, y = df.plot[which(round(df.plot$focal.seq,1)==round(values$co,1)),"pe"],
-      #         xmin= confint(m.repar)["C","2.5%"],
-      #          xmax=confint(m.repar)["C","97.5%"],
-      #          colour = "black", size = 2, alpha = .5, linetype = "solid", height = 5) +
-      #   # }
-      #
-      #
+    plot.lin <- interactiv.plot(data=data,dfpoints=dfpoints,plotdf=df.plot)
 
     if(values$co <= max(df.plot$focal.seq) & values$co >= min(df.plot$focal.seq))
        {
       plot.lin <- plot.lin +
         annotate("point", x = values$co, y =
                  # as.numeric(mode(df.plot$pe)),
-               df.plot[which(round(df.plot$focal.seq,1)==round(values$co,1)),"pe"],
+                   (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
                color= "black", fill = "orange", size = 3, shape = 23)
     }
 
-    # if(summary(m)$coefficients[paste0(foc,":",mod),"Pr(>|t|)"] > .05){
-    #   plot.lin <- plot.lin + annotate("text", x = mean(data[,input$foc], na.rm = TRUE), y = median(data[,input$dv], na.rm = TRUE), label = "NOT SIGNIFICANT", size = 7)
-    # }
     values$df.plot<-df.plot
 plot.lin
       }
@@ -739,74 +787,16 @@ else{
       df.staticplot<-df.staticplot[57:225,]
       values$df.staticplot<-df.staticplot
 
-      staticplot<-ggplot() +
-
-        geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
-        geom_ribbon(data=df.staticplot, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
-        geom_line(data = df.staticplot, aes(focal.seq, pe, fill=level, color=level), size=2) +
-
-        ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
-
-        #Similarly, define my x axis based on the minimum and maximum values observed in my data
-        xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
-
-        #Manual specification of the RColorBrewer blue palette
-
-        #thematic specifications of my graphic
-        theme(text=element_text(family="Trebuchet MS",size=15, color="black"),
-              legend.position="none",
-              panel.background = element_blank(),
-              legend.background = element_rect(fill = "white"),
-              legend.title=element_blank(),
-              legend.key = element_rect(fill = "white"),
-              panel.grid.minor = element_blank(),
-              axis.text.x=element_text(colour="black"),
-              axis.text.y=element_text(colour="black"),
-              axis.title.y=element_text(size=15),
-              panel.grid.major = element_line(colour="#C0C0C0"),
-              plot.background=element_rect(fill='white')) +
-        labs(fill = mod, color = mod, linetype=mod) +
-
-        #These are labels based on the current data, but I will build this out to be more dynamic in the future, allowing users to specify their own axis and plot labels.
-        labs(x = foc, y = dv) +
-
-
-        coord_cartesian() +
-
-        #Across the title, I provide the point estimate and p-value for the focal predictor at the given level of the moderator. Note that there are some minor rounding issues I need to fix that result in p-values equalling zero (not possible).
-
-        ggtitle(paste0("Level of Moderator (",mod,")")) +
-
-        #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
-
-        geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
-
-        facet_grid(~level) +
-        scale_color_manual(values=df.cols$col) +
-        #Define my fill reigion as lighter versions of the above
-        scale_fill_manual(values=df.cols$colslight) +
-
-        # annotate("segment", x = confint(values$m.repar)["C","2.5%"],
-        #          xend = confint(values$m.repar)["C","97.5%"],
-        #          y = 50,
-        #          yend = 50,
-        #          colour = "black", linetype = "solid", size = 3) +
-
-        theme(plot.title = element_text(family="Trebuchet MS", face="bold", size=15, hjust=0, color="black"))
+      staticplot<-interactiv.plot2(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
 
       if(values$co <= max(df.staticplot$focal.seq) & values$co >= min(df.staticplot$focal.seq))
       {
         staticplot <- staticplot +
           annotate("point", x = values$co, y =
                      # as.numeric(mode(df.plot$pe)),
-                     df.staticplot[which(round(df.staticplot$focal.seq,1)==round(values$co,1)),"pe"],
+                     (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
                    color= "black", fill = brewer.pal(9,"Greys")[2], size = 2, shape = 23)
       }
-
-      # # if(summary(m.mean)$coefficients[paste0(foc,":",mod),"Pr(>|t|)"] > .05){
-      #   staticplot <- staticplot + annotate("text", x = median(data[,input$foc], na.rm = TRUE), y = median(data[,input$dv]), label = "NOT SIGNIFICANT", size = 7)
-      # # }
-
 
       values$plot<-staticplot; staticplot
   }
@@ -840,7 +830,7 @@ else{
       ppoints$pe[j]<-lm$coefficients["(Intercept)"]
       ppoints$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
       ppoints$focal.seq<-focal.seq
-      leveltemp<-rep(paste0("B = ",
+      leveltemp<-rep(paste0("b = ",
                                 round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
                                 round(confint(lm)["s.foc","2.5 %"],2),", ",
                                 round(confint(lm)["s.foc","97.5 %"],2),"]"))
@@ -918,74 +908,16 @@ else{
     values$df.cols<-df.cols
     #
 
-    staticplot<-ggplot() +
-
-      geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
-      geom_ribbon(data=df.staticplot, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
-      geom_line(data = df.staticplot, aes(focal.seq, pe, fill=level, color=level), size=2) +
-
-      ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
-
-      #Similarly, define my x axis based on the minimum and maximum values observed in my data
-      xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
-
-      #Manual specification of the RColorBrewer blue palette
-
-      #thematic specifications of my graphic
-      theme(text=element_text(family="Trebuchet MS",size=15, color="black"),
-            legend.position="none",
-            panel.background = element_blank(),
-            legend.background = element_rect(fill = "white"),
-            legend.title=element_blank(),
-            legend.key = element_rect(fill = "white"),
-            panel.grid.minor = element_blank(),
-            axis.text.x=element_text(colour="black"),
-            axis.text.y=element_text(colour="black"),
-            axis.title.y=element_text(size=15),
-            panel.grid.major = element_line(colour="#C0C0C0"),
-            plot.background=element_rect(fill='white')) +
-      labs(fill = mod, color = mod, linetype=mod) +
-
-      #These are labels based on the current data, but I will build this out to be more dynamic in the future, allowing users to specify their own axis and plot labels.
-      labs(x = foc, y = dv) +
-
-
-      coord_cartesian() +
-
-      #Across the title, I provide the point estimate and p-value for the focal predictor at the given level of the moderator. Note that there are some minor rounding issues I need to fix that result in p-values equalling zero (not possible).
-
-      ggtitle(paste0("Level of Moderator (",mod,")")) +
-
-      #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
-
-      geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
-
-      facet_grid(~level) +
-      scale_color_manual(values=df.cols$col) +
-      #Define my fill reigion as lighter versions of the above
-      scale_fill_manual(values=df.cols$colslight) +
-
-      # annotate("segment", x = confint(values$m.repar)["C","2.5%"],
-      #                     xend = confint(values$m.repar)["C","97.5%"],
-      #                     y = 50,
-      #                     yend = 50,
-      #                     colour = "black", linetype = "solid", size = 3) +
-
-      theme(plot.title = element_text(family="Trebuchet MS", face="bold", size=15, hjust=0, color="black"))
+    staticplot<-interactiv.plot2(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
 
     if(values$co <= max(df.staticplot$focal.seq) & values$co >= min(df.staticplot$focal.seq))
     {
       staticplot <- staticplot +
         annotate("point", x = values$co, y =
                    # as.numeric(mode(df.plot$pe)),
-                   df.staticplot[which(round(df.staticplot$focal.seq,1)==round(values$co,1)),"pe"],
+                   (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
                  color= "black", fill = brewer.pal(9,"Greys")[2], size = 2, shape = 23)
     }
-
-    # # if(summary(m.mean)$coefficients[paste0(foc,":",mod),"Pr(>|t|)"] > .05){
-    #   staticplot <- staticplot + annotate("text", x = median(data[,input$foc], na.rm = TRUE), y = median(data[,input$dv]), label = "NOT SIGNIFICANT", size = 7)
-    # # }
-
 
     values$plot<-staticplot; staticplot
   #end of else statement for non-two-part static plots
