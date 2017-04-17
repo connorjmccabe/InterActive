@@ -260,7 +260,26 @@ actionButton("go","Run Analysis", width = "100%", icon = icon("fa fa-thumbs-up")
 output$ui.rosgo <- renderUI ({
   if (is.null(input$file1))
     return()
-  actionButton("go","Make RoS plot", width = "100%", icon = icon("fa fa-thumbs-up"))
+  actionButton("rosgo","Make RoS plot", width = "100%", icon = icon("fa fa-thumbs-up"))
+})
+
+output$ui.xlab.ros<-renderUI ({
+  if (is.null(input$file1))
+    return()
+  
+  textInput(inputId="xaxislab.ros",
+            label="X-Axis label:",
+            value=input$mod)
+})
+
+#Y axis label
+output$ui.ylab.ros<-renderUI ({
+  if (is.null(input$file1))
+    return()
+  
+  textInput(inputId="yaxislab.ros",
+            label="Y-Axis label:",
+            value=paste("Simple Slope of ",input$foc))
 })
 
 observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all the ui input and runs the model.
@@ -387,7 +406,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         #Manual specification of the RColorBrewer blue palette
         
         #thematic specifications of my graphic
-        theme(text=element_text(family="Times",size=15, color="black"),
+        theme(text=element_text(family="Helvetica",size=12, color="black"),
               legend.position="none",
               panel.background = element_blank(),
               legend.background = element_rect(fill = "white"),
@@ -395,8 +414,9 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
               legend.key = element_rect(fill = "white"),
               panel.grid.minor = element_blank(),
               axis.text.x=element_text(colour="black"),
+              axis.title.x=element_text(size=14),
               axis.text.y=element_text(colour="black"),
-              axis.title.y=element_text(size=15),
+              axis.title.y=element_text(size=14),
               panel.grid.major = element_line(colour="#C0C0C0"),
               plot.background=element_rect(fill='white')) +
         labs(fill = mod, color = mod, linetype=mod) +
@@ -426,7 +446,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         #          yend = 50,
         #          colour = "black", linetype = "solid", size = 3) +
         
-        theme(plot.title = element_text(family="Times", face="bold", size=15, hjust=0, color="black"))
+        theme(plot.title = element_text(family="Helvetica", face="bold", size=14, hjust=0, color="black"))
     }
     
     interactiv.plot2<-function(data, dfpoints, plotdf){
@@ -444,7 +464,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         #Manual specification of the RColorBrewer blue palette
         
         #thematic specifications of my graphic
-        theme(text=element_text(family="Times",size=15, color="black"),
+        theme(text=element_text(family="Helvetica",size=12, color="black"),
               legend.position="none",
               panel.background = element_blank(),
               legend.background = element_rect(fill = "white"),
@@ -452,8 +472,9 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
               legend.key = element_rect(fill = "white"),
               panel.grid.minor = element_blank(),
               axis.text.x=element_text(colour="black"),
+              axis.title.x=element_text(size=14),
               axis.text.y=element_text(colour="black"),
-              axis.title.y=element_text(size=15),
+              axis.title.y=element_text(size=14),
               panel.grid.major = element_line(colour="#C0C0C0"),
               plot.background=element_rect(fill='white')) +
         labs(fill = mod, color = mod, linetype=mod) +
@@ -483,7 +504,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         #                     yend = 50,
         #                     colour = "black", linetype = "solid", size = 3) +
         
-        theme(plot.title = element_text(family="Times", face="bold", size=15, hjust=0, color="black"))
+        theme(plot.title = element_text(family="Helvetica", face="bold", size=14, hjust=0, color="black"))
     }
     
       data<-df() #pull in defined data
@@ -615,13 +636,13 @@ values$model2<-values$form2
    }
 
 # MAKING RoS PLOT ---------------------------------------------------------
-
+observeEvent(input$rosgo, {
 df.ros<-dftrue
 df.ros[,foc] <- scale(df.ros[,foc])
 df.ros[,mod] <- scale(df.ros[,mod])
 # df.ros[,dv]<- scale(df.ros[,mod])
 
-hyp.Z <- seq(-3,3,.1)
+hyp.Z <- seq(-3,3,.05)
 
       ros <- sapply(hyp.Z, function(i) {
         df.ros[,mod] <- round(df.ros[,mod],2) - i
@@ -632,15 +653,10 @@ hyp.Z <- seq(-3,3,.1)
       colnames(ros) <- c("hyp.Z","pe.X","SE","LL","UL")
       ros$significance[(ros$LL*ros$UL) > 0] <- "sig"
       ros$significance[(ros$LL*ros$UL) <= 0] <- "not sig"
-      ros.sig<-ros[ros$significance=="sig",]
-      if(min(ros.sig$hyp.Z) < 0 && max(ros.sig$hyp.Z) > 0){
-      ros.siglow<-ros[ros$significance=="sig" & ros$hyp.Z < 0,"hyp.Z"]
-      ros.sighigh<-ros[ros$significance=="sig" & ros$hyp.Z > 0,"hyp.Z"]
-      }
-      else(ros.siglow<-ros.sighigh<-ros[ros$significance=="sig","hyp.Z"])
-
-      values$ros<-ros
-      values$ros.sighigh<-ros.sighigh
+      ros$sign[ros$pe.X<0]<-"neg"
+      ros$sign[ros$pe.X>=0]<-"pos"
+      
+      values$ros<-ros[c("hyp.Z","pe.X","LL","UL")]
 
 #Creating the RoS plot
       rosplot <- ggplot() +
@@ -650,16 +666,44 @@ hyp.Z <- seq(-3,3,.1)
         scale_x_continuous(breaks = c(-3,-2,-1,0,1,2,3),labels = c(-3,-2,-1,0,1,2,3),limits = c(-3,3)) +
         ylim(min(ros$LL),max(ros$UL)) +
         geom_hline(yintercept = 0) +
-        # geom_vline(xintercept = max(ros.siglow), linetype="dashed") +
-        # geom_vline(xintercept = max(ros.sighigh), linetype="dashed") +
-        xlab(mod) +
-        ylab(paste0("Simple Slope of\n",foc)) +
+        xlab(input$xaxislab.ros) +
+        ylab(input$yaxislab.ros) +
         geom_rug(data = df.ros, aes(x=df.ros[,mod])) +
         # geom_density(data = df.ros, aes(x=df.ros[,mod]), linetype = "dotted", fill=brewer.pal(3,"Greys")[2], alpha = .25, position = position_dodge(width = .2)) +
         theme_bw() +
-        theme(text=element_text(family="Times",size=15, color="black"))
+        theme(text=element_text(family="Helvetica",size=12, color="black"))
+
+if(m$coefficients[paste0(foc,":",mod)]<0){
+if("not sig"%in%ros[which(ros$sign=="neg"),"significance"]==TRUE &
+   "sig"%in%ros[which(ros$sign=="neg"),"significance"]==TRUE ){  
+      rosplot <- rosplot + 
+        geom_vline(xintercept = min(ros[which(ros$significance=="sig" & ros$sign=="neg"),"hyp.Z"]), linetype="dashed")
+}
+      
+if("not sig"%in%ros[which(ros$sign=="pos"),"significance"]==TRUE &
+         "sig"%in%ros[which(ros$sign=="pos"),"significance"]==TRUE){  
+        rosplot <- rosplot + 
+          geom_vline(xintercept = max(ros[which(ros$significance=="sig" & ros$sign=="pos"),"hyp.Z"]), linetype="dashed")
+}
+}
+else{
+  if("not sig"%in%ros[which(ros$sign=="neg"),"significance"]==TRUE &
+     "sig"%in%ros[which(ros$sign=="neg"),"significance"]==TRUE ){  
+    rosplot <- rosplot + 
+      geom_vline(xintercept = max(ros[which(ros$significance=="sig" & ros$sign=="neg"),"hyp.Z"]), linetype="dashed")
+  }
+  
+  if("not sig"%in%ros[which(ros$sign=="pos"),"significance"]==TRUE &
+     "sig"%in%ros[which(ros$sign=="pos"),"significance"]==TRUE){  
+    rosplot <- rosplot + 
+      geom_vline(xintercept = min(ros[which(ros$significance=="sig" & ros$sign=="pos"),"hyp.Z"]), linetype="dashed")
+  }
+}
+      
 
 values$rosplot<-rosplot
+
+})
 
 # Define Dynamic Plots ----------------------------------------------------
 
@@ -963,13 +1007,13 @@ return(NULL)
     output$downloadPlot <- downloadHandler(
       filename = 'ModerationPlot.png',
       content = function(file) {
-        ggsave(file,values$plot)
+        ggsave(file,values$plot, width = 7, height = 4, units = "in")
       })
 
     output$downloadPlot.final <- downloadHandler(
       filename = 'ModerationPlot.final.png',
       content = function(file) {
-        ggsave(file,values$plotfinal)
+        ggsave(file,values$plotfinal, width = 7, height = 4, units = "in")
       })
 
     output$downloadEst <- downloadHandler(
@@ -981,7 +1025,7 @@ return(NULL)
     output$rosplot.final <- downloadHandler(
       filename = 'rosplot.png',
       content = function(file) {
-        ggsave(file,values$rosplot)
+        ggsave(file,values$plotfinal.ros,width = 7, height = 4, units = "in")
       })
 
 
@@ -1025,7 +1069,15 @@ output$rosplot <- renderPlot({
   # values$df.plot
   values$rosplot
 })
-
+output$plot.final.ros <- renderPlot({
+  if (is.null(values$rosplot))
+    return(NULL)
+  plotfinal.ros<-values$rosplot +
+    xlab(input$xaxislab.ros) +
+    ylab(input$yaxislab.ros)
+  values$plotfinal.ros<-plotfinal.ros
+  plotfinal.ros
+})
 output$plot.final <- renderPlot({
   if (is.null(input$file1))
     return(NULL)

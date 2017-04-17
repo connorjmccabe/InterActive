@@ -84,7 +84,11 @@ shinyUI(fluidPage(
       tabPanel("Marginal Effects",
                # verbatimTextOutput("focal.hyp"),
                column(8,
-                      plotOutput("rosplot"),
+                      uiOutput("ui.rosgo"),
+                      plotOutput("plot.final.ros"),
+                      fluidRow(column(4,
+                                      uiOutput("ui.xlab.ros"),
+                                      uiOutput("ui.ylab.ros"))),
                       downloadButton('rosplot.final',"Download Regions of Significance Plot")),
                column(4,
                       tableOutput("rostest")
