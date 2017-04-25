@@ -1041,8 +1041,7 @@ output$plotdata <- renderTable({
   if (is.null(input$file1))
     return(NULL)
 
-  # values$df.plot
-  values$dfpoints
+  values$dfplot
 })
 
 output$test.tab <- renderText({
