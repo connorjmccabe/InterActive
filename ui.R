@@ -18,6 +18,8 @@ shinyUI(fluidPage(
                accept=c('text/csv',
                         'text/comma-separated-values,text/plain',
                         '.csv',
+                        '.xls',
+                        '.xlsx',
                         '.sav')),
 
       # if (!is.null(input$file1)){

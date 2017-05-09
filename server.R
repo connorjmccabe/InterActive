@@ -89,11 +89,15 @@ textInputRow<-function (inputId, label, value = "")
 
     df<-reactive({
       if (!is.null(input$file1)){
-        if(input$file1$type == "text/csv"){
+        if(tools::file_ext(input$file1) == "csv"){
           read.csv(input$file1$datapath, header = TRUE)
         }
-        else{
-          read.spss(input$file1$datapath, to.data.frame=TRUE)
+        else if (tools::file_ext(input$file1) == "xls" |
+                 tools::file_ext(input$file1) == "xlsx"){
+          xlsx::read.xlsx(input$file1$datapath, as.data.frame=TRUE, sheetIndex = 1)
+        }
+        else if (tools::file_ext(input$file1) == "sav"){
+          foreign::read.spss(input$file1$datapath, to.data.frame=TRUE)
         }
       }
     })
@@ -396,7 +400,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
     interactiv.plot<-function(data, dfpoints, plotdf){
       geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
         geom_ribbon(data=plotdf, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
-        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=2) +
+        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=1) +
         
         ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
         
@@ -454,7 +458,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         
         geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
         geom_ribbon(data=plotdf, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
-        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=2) +
+        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=1) +
         
         ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
         
