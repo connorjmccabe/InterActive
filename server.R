@@ -1,3 +1,5 @@
+#CATEGORICAL MODERATOR
+
 options(digits=9)
 options(shiny.maxRequestSize=20*1024^2) #max file size = 20 MB
 require(ggplot2)
@@ -77,7 +79,7 @@ textInputRow<-function (inputId, label, value = "")
 
 # END HELPER FUNCTIONS ----------------------------------------------------
 
-  function(input, output) {
+  function(input, output, session) {
     values<-reactiveValues() #defines empty list that will take model-produced values
     output$msg<-renderText({
     if (is.null(input$file1)){
@@ -92,9 +94,15 @@ textInputRow<-function (inputId, label, value = "")
         if(tools::file_ext(input$file1) == "csv"){
           read.csv(input$file1$datapath, header = TRUE)
         }
-        else if (tools::file_ext(input$file1) == "xls" |
-                 tools::file_ext(input$file1) == "xlsx"){
-          xlsx::read.xlsx(input$file1$datapath, as.data.frame=TRUE, sheetIndex = 1)
+        else if (tools::file_ext(input$file1) == "xlsx"){
+          file.rename(input$file1$datapath,
+                      paste(input$file1$datapath, ".xlsx", sep=""))
+          as.data.frame(readxl::read_excel(paste(input$file1$datapath, ".xlsx", sep=""), 1,col_names = TRUE))
+        }
+        else if (tools::file_ext(input$file1) == "xls"){
+          file.rename(input$file1$datapath,
+                      paste(input$file1$datapath, ".xls", sep=""))
+          as.data.frame(readxl::read_xls(paste(input$file1$datapath, ".xls", sep=""), 1,col_names = TRUE))
         }
         else if (tools::file_ext(input$file1) == "sav"){
           foreign::read.spss(input$file1$datapath, to.data.frame=TRUE)
@@ -113,22 +121,37 @@ textInputRow<-function (inputId, label, value = "")
 
 # Continuous Variable Scaling Options -----------------------------------------------
 
-output$ui.scale <- renderUI ({
+output$ui.scalex <- renderUI ({
   if (is.null(input$file1))
     return()
-  radioButtons(inputId="scale", label = h4("Continuous Variable Scaling:"),
-               c("Raw" = "raw", "Centered" = "cen", "Standardized" = "std"),
+  radioButtons(inputId="scalex", label = NULL, inline = TRUE,
+               c("Raw X" = "raw", "Centered X" = "cen", "Standardized X" = "std"),
                selected = "cen")
 })
+
+    output$ui.scalez <- renderUI ({
+      if (is.null(input$file1))
+        return()
+      radioButtons(inputId="scalez", label = NULL, inline = TRUE,
+                   c("Raw Z" = "raw", "Centered Z" = "cen", "Standardized Z" = "std"),
+                   selected = "cen")
+    })
+    output$ui.scaledv <- renderUI ({
+      if (is.null(input$file1))
+        return()
+      radioButtons(inputId="scaledv", label = NULL, inline = TRUE,
+                   c("Raw Y" = "raw", "Centered Y" = "cen", "Standardized Y" = "std"),
+                   selected = "raw")
+    })
     
 # Building the model options ------------------------------------------
 
-    output$ui.manual <- renderUI ({
-      if (is.null(input$file1))
-        return()
-      checkboxInput(inputId="manual", label = h5("Manual Formula"),
-                    value=FALSE)
-    })
+    # output$ui.manual <- renderUI ({
+    #   if (is.null(input$file1))
+    #     return()
+    #   checkboxInput(inputId="manual", label = h5("Manual Formula"),
+    #                 value=FALSE)
+    # })
 
 #Specify covariates for the model
 
@@ -136,11 +159,11 @@ output$ui.covars <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE)
-    return()
+  # if (input$manual==TRUE)
+  #   return()
 
   selectInput(inputId = "covars",
-              label = "Choose your covariate(s):",
+              label = "Choose your covariate(s)\n(control variables):",
               choices = colnames(df()),
               selected = "",
               multiple = TRUE,
@@ -153,14 +176,14 @@ output$ui.foc <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE) {textInput("foc", label = "Specify your focal (x-axis) variable:", value = "", placeholder = "X")}
-  else{
+  # if (input$manual==TRUE) {textInput("foc", label = "Specify your focal (x-axis) variable:", value = "", placeholder = "X")}
+  # else{
 
   selectInput("foc",
               label = "Choose your focal (x-axis) variable:",
               choices = colnames(df()),
               selected = "")
-  }
+  # }
 })
 
 # Specify moderator variable (appearing on legend dimension)
@@ -169,14 +192,14 @@ output$ui.mod <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE) {textInput("mod", label = "Specify your moderator (legend) variable:", value = "", placeholder = "Z")}
-  else{
+  # if (input$manual==TRUE) {textInput("mod", label = "Specify your moderator (legend) variable:", value = "", placeholder = "Z")}
+  # else{
 
   selectInput("mod",
               label = "Choose your moderator (legend) variable:",
               choices = colnames(df()),
               selected = "")
-  }
+  # }
 })
 
 #Specify outcome variable (appearing on y-axis)
@@ -184,8 +207,8 @@ output$ui.dv <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE)
-    return()
+  # if (input$manual==TRUE)
+  #   return()
 
   selectInput("dv",
               label = "Choose your dependent (y-axis) variable:",
@@ -198,23 +221,23 @@ output$ui.poly <- renderUI ({
   if (is.null(input$file1))
     return()
 
-  if (input$manual==TRUE)
-    return()
+  # if (input$manual==TRUE)
+  #   return()
 
 radioButtons(inputId="poly", label = h4("Form of Focal Predictor:"),
              c("Linear" = "lin", "Quadratic" = "quad"),
              selected = "lin")
 })
-
-output$ui.formula <- renderUI ({
-  if (is.null(input$file1))
-    return()
-
-  if (input$manual==FALSE)
-    return()
-
-  textAreaInput("manform", label = "Formula", value = "", placeholder = "Y ~ X + Z + X*Z")
-})
+# 
+# output$ui.formula <- renderUI ({
+#   if (is.null(input$file1))
+#     return()
+# 
+#   # if (input$manual==FALSE)
+#   #   return()
+# 
+#   textAreaInput("manform", label = "Formula", value = "", placeholder = "Y ~ X + Z + X*Z")
+# })
 
 # Define "go" button to run the model
 
@@ -285,14 +308,37 @@ output$ui.ylab.ros<-renderUI ({
             label="Y-Axis label:",
             value=paste("Simple Slope of ",input$foc))
 })
+output$ui.title.ros<-renderUI ({
+  if (is.null(input$file1))
+    return()
+  
+  textInput(inputId="rostitle",
+            label="Title of Graph:",
+            value="")
+})
+
+output$varnames <- renderTable({
+  if (is.null(input$file1))
+    return()
+  if (is.null(input$go))
+    return()
+  # varlist<-as.data.frame(cbind(colnames(df()),attr(df(),"variable.labels")))
+  desc<- as.data.frame(psych::describe(df()))[,c("mean","sd","min","max","skew")]
+  varlist<-cbind(colnames(df()),desc)
+  colnames(varlist)<-c("Variable",colnames(desc))
+  varlist
+  # colnames(varlist)<-c("Variable","Variable Label")
+})
 
 observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all the ui input and runs the model.
-  
+  updateTabsetPanel(session, "inTabset",
+                    selected = "Plot")
   # Define small multiple moderator values
   
   output$ui.sm1<-renderUI ({
     if (is.null(input$file1))
       return()
+    if (input$cat==TRUE) return()
     
     textInput(inputId="sm1",
               label="Multiple 1",
@@ -302,7 +348,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
   output$ui.sm2<-renderUI ({
     if (is.null(input$file1))
       return()
-    
+    if (input$cat==TRUE) return()
     textInput(inputId="sm2",
               label="Multiple 2",
               value= -1,
@@ -312,6 +358,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
   output$ui.sm3<-renderUI ({
     if (is.null(input$file1))
       return()
+    if (input$cat==TRUE) return()
     
     textInput(inputId="sm3",
               label="Mulitple 3",
@@ -321,7 +368,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
   output$ui.sm4<-renderUI ({
     if (is.null(input$file1))
       return()
-    
+    if (input$cat==TRUE) return()
     textInput(inputId="sm4",
               label="Multiple 4",
               value= 1,
@@ -331,6 +378,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
   output$ui.sm5<-renderUI ({
     if (is.null(input$file1))
       return()
+    if (input$cat==TRUE) return()
     
     textInput(inputId="sm5",
               label="Multiple 5",
@@ -343,51 +391,75 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
     downloadButton('downloadPlot', 'Download Plot')
   })
 
-  output$ui.modlevel<- renderUI ({
-    if (is.null(input$file1))
-      return()
-    if (input$static==TRUE)
-      return()
-
-    data<-df() #Pull data from uploaded data set
-    mod <- input$mod #Define moderator from input
-    if(input$cat==FALSE){
-    if (input$scale == "cen"){mod.temp <- scale(data[,mod], scale = FALSE, center = TRUE)}
-    if (input$scale == "std"){mod.temp <- scale(data[,mod], scale = TRUE)}
-    }
-
-    #Defines anchors for the slider, ranging from -3 to +3 SDs
-    modlow <- -3*sd(mod.temp, na.rm = TRUE)
-    modmean <- mean(mod.temp, na.rm = TRUE)
-    modhigh <- 3*sd(mod.temp, na.rm = TRUE)
-
-    values$modhyplow<-round(modlow,2)
-    values$modhypmean<-round(modmean,2)
-    values$modhyphigh<-round(modhigh,2)
-
-    # DEFINE MODERATOR SLIDER
-    wellPanel(sliderInput("modlevel", "Level of Moderator:",
-                round(modlow,2),
-                round(modhigh,2),
-               round(modmean,2),
-                step = .1, animate=
-                  animationOptions(interval=1000, loop=TRUE)))
-
-  })
+  # output$ui.modlevel<- renderUI ({
+  #   if (is.null(input$file1))
+  #     return()
+  #   if (input$static==TRUE)
+  #     return()
+  # 
+  #   data<-df() #Pull data from uploaded data set
+  #   mod <- input$mod #Define moderator from input
+  #   if(input$cat==FALSE){
+  #   if (input$scale == "cen"){mod.temp <- scale(data[,mod], scale = FALSE, center = TRUE)}
+  #   if (input$scale == "std"){mod.temp <- scale(data[,mod], scale = TRUE)}
+  #   }
+  # 
+  #   #Defines anchors for the slider, ranging from -3 to +3 SDs
+  #   modlow <- -3*sd(mod.temp, na.rm = TRUE)
+  #   modmean <- mean(mod.temp, na.rm = TRUE)
+  #   modhigh <- 3*sd(mod.temp, na.rm = TRUE)
+  # 
+  #   values$modhyplow<-round(modlow,2)
+  #   values$modhypmean<-round(modmean,2)
+  #   values$modhyphigh<-round(modhigh,2)
+  # 
+  #   # DEFINE MODERATOR SLIDER
+  #   wellPanel(sliderInput("modlevel", "Level of Moderator:",
+  #               round(modlow,2),
+  #               round(modhigh,2),
+  #              round(modmean,2),
+  #               step = .1, animate=
+  #                 animationOptions(interval=1000, loop=TRUE)))
+  # 
+  # })
 
 
   # Static display button
-  output$ui.static <- renderUI ({
-    if (is.null(input$file1))
-      return()
-    checkboxInput(inputId="static", label = h5("Static Display"),
-                  value=TRUE)
-  })
+  # output$ui.static <- renderUI ({
+  #   if (is.null(input$file1))
+  #     return()
+  #   checkboxInput(inputId="static", label = h5("Static Display"),
+  #                 value=TRUE)
+  # })
 
 #2. Analyze and Report Results in Table -------------------------------------
 
 #output$modplot creates a plot graphic, either dynamic or static, based upon the selected model and the given level of a moderator.
-
+  output$ui.catsm1<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    if (input$cat==FALSE)
+      return()
+    mod <- input$mod
+    mod.seq<-na.omit(unique(df()[,mod]))
+    textInput(inputId="catsm1",
+              label="Category 0",
+              value= paste("Category ",mod.seq[1]),
+              width = "50%")  
+  })
+  
+  output$ui.catsm2<-renderUI ({
+    if (is.null(input$file1))
+      return()
+    if (input$cat==FALSE)
+      return()
+    mod <- input$mod
+    mod.seq<-na.omit(unique(df()[,mod]))
+    textInput(inputId="catsm2",
+              label="Category 1",
+              value= paste("Category ",mod.seq[2]),
+              width = "50%")  
+  })
 # PLOT CREATOR ------------------------------------------------------------
   output$modplot <- renderPlot({
       if (is.null(input$file1))
@@ -515,32 +587,46 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
       dftrue<-df()
       mod <- input$mod #define moderator
       foc <- input$foc #define focal predictor
-      if( input$manual == TRUE){dv <- sub('\\ ~.*', '', format(input$manform))}
-      else{dv <- input$dv}
-
-      if (input$scale == "cen"){
-        if(input$cat==FALSE){data[,mod] <- scale(data[,mod],  scale = FALSE, center = TRUE)}
+      # if( input$manual == TRUE){dv <- sub('\\ ~.*', '', format(input$manform))}
+      # else{dv <- input$dv}
+      dv <- input$dv
+        
+      if (input$scalex == "cen"){
         data[,foc] <- scale(data[,foc],  scale = FALSE, center = TRUE)
-        if(input$cat==FALSE){dftrue[,mod] <- scale(dftrue[,mod],  scale = FALSE, center = TRUE)}
         dftrue[,foc] <- scale(dftrue[,foc],  scale = FALSE, center = TRUE)
-
       }
-      if (input$scale == "std"){
-        if(input$cat==FALSE){data[,mod] <- scale(data[,mod], scale = TRUE)}
-        data[,foc] <- scale(data[,foc], scale = TRUE)
-        if(input$cat==FALSE){dftrue[,mod] <- scale(dftrue[,mod],  scale = TRUE)}
+      if (input$scalez == "cen" && input$cat==FALSE){
+        data[,mod] <- scale(data[,mod],  scale = FALSE, center = TRUE)
+        dftrue[,mod] <- scale(dftrue[,mod],  scale = FALSE, center = TRUE)
+      }
+        
+      if (input$scaledv == "cen"){
+        data[,dv] <- scale(data[,dv],  scale = FALSE, center = TRUE)
+        dftrue[,dv] <- scale(dftrue[,dv],  scale = FALSE, center = TRUE)
+      }
+      
+      if (input$scalex == "std"){
+        data[,foc] <- scale(data[,foc],  scale = TRUE)
         dftrue[,foc] <- scale(dftrue[,foc],  scale = TRUE)
       }
-
+      if (input$scalez == "std" && input$cat==FALSE){
+        data[,mod] <- scale(data[,mod],  scale = TRUE)
+        dftrue[,mod] <- scale(dftrue[,mod],  scale = TRUE)
+      }
+      if (input$scaledv == "std"){
+        data[,dv] <- scale(data[,dv],  scale = TRUE)
+        dftrue[,dv] <- scale(dftrue[,dv],  scale = TRUE)
+      }
 
       values$modlevel<-input$modlevel
-      if(input$static == TRUE) (values$modlevel<- mean(data[,mod], na.rm = TRUE))
+      # if(input$static == TRUE) 
+     if(input$cat == FALSE) (values$modlevel<- mean(data[,mod], na.rm = TRUE))
       modlevel <- values$modlevel
 
       if(input$cat==FALSE){data[,mod]<-data[,mod]-values$modlevel} #NOTE: This MUST come after the input$scale parts above!!!!!
 
       #Here, I build a formula based on user inputs.
-      if(input$manual == FALSE){
+      # if(input$manual == FALSE){
       cov<-paste(input$covars, collapse=" + ")#define covariate portion based on what the user specified
 
       if (input$poly == "quad"){ #if user selects a quadratic focal term, the below code will be run.
@@ -556,30 +642,35 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
       else{
         #here, I paste together a formula based on user inputs for a standard linear model.
         focmod<-paste("+",foc,"+",mod,"+",foc,"*",mod)} #Define all predictor terms (including interaction).
-      }
+      # }
 
-        if(input$manual == FALSE){dep<-paste(input$dv, "~")} # Define outcome variable
+        # if(input$manual == FALSE){dep<-paste(input$dv, "~")} # Define outcome variable
+      dep<-paste(input$dv, "~")
         # else{dep<-sub('~*', '', input$formula)}
 
-        if (input$manual==TRUE){values$form<-as.formula(input$manform)}
-        else{values$form<-as.formula(paste(dep,cov,focmod))}
-        formula<-values$manform
+        # if (input$manual==TRUE){values$form<-as.formula(input$manform)}
+        # else{values$form<-as.formula(paste(dep,cov,focmod))}
+      values$form<-as.formula(paste(dep,cov,focmod))
+        # formula<-values$manform
 
           values$m<-lm(values$form,data, na.action = na.omit)
           values$mtrue<-lm(values$form,dftrue, na.action = na.omit)
 
-        if (input$manual==FALSE){
+        # if (input$manual==FALSE){
           values$model<-as.formula(paste(dep,cov,focmod))
-          } #need just one part of the model for two-part models to do simulations later
+          # } #need just one part of the model for two-part models to do simulations later
 
       m <- values$m
       mtrue <- values$mtrue
 
 # Crossover point computation using reparameterization method
 
+        data[,mod] <- as.numeric(data[,mod])
+        dftrue[,mod] <- as.numeric(dftrue[,mod])
+        
       values$co<- -(m$coefficients[mod]/(m$coefficients[paste0(foc,":",mod)]))
 
-      repar.df<-as.data.frame(cbind(data[,foc],data[,mod], data[,dv]))
+      repar.df<-as.data.frame(cbind(data[,foc],as.numeric(data[,mod]), data[,dv]))
       colnames(repar.df)<-c("focal","moder","outcome")
 
       m.repar<-nls(outcome ~ B0 + B1*(focal - C) + B3*((focal - C)*moder),
@@ -589,15 +680,15 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
                        C = values$co,
                        B3 = m$coefficients[paste0(foc,":",mod)]))
       values$m.repar<-m.repar
-
+      
   # DEFINE FOR STATIC PLOTS -------------------------------------------------
-      if(input$manual == TRUE){
-        formtemp<-as.formula(gsub(mod, "s.mod", format(input$manform)))
-        values$form2<-as.formula(gsub(foc, "s.foc", formtemp))
+      # if(input$manual == TRUE){
+        # formtemp<-as.formula(gsub(mod, "s.mod", format(input$manform)))
+        # values$form2<-as.formula(gsub(foc, "s.foc", formtemp))
 
-values$model2<-values$form2
-        }
-      else{
+# values$model2<-values$form2
+        # }
+      # else{
       cov<-paste(input$covars, collapse="+") #define covariate portion based on what the user specified
       if (input$poly == "quad"){ #if user selects a quadratic focal term, the below code will be run.
         focmod2<-paste("+",
@@ -614,33 +705,34 @@ values$model2<-values$form2
         focmod2<-paste("+","s.foc","+","s.mod","+","s.foc","*","s.mod")
         } #Define all predictor terms
       dep2<-paste(input$dv, "~") # Define outcome variable
-      }
+      # }
 
 #DEFINE STATIC PLOT FOR CATEGORICAL MODERATOR
       if(input$cat==TRUE){
 
-          if(input$manual == FALSE){
+          # if(input$manual == FALSE){
             values$form2<-as.formula(paste(dep2,cov,focmod2))
             values$model2<-as.formula(paste(dep2,cov,focmod2))
-          }
-
+          # }
+          data$s.foc<-data[,foc]
           data$s.mod <- data[,mod]-min(unique(data[,mod]),na.rm=TRUE)
-          m.cat0<-lm(values$form2,data, na.action = na.omit)
+          values$m.cat0<-lm(values$form2,data, na.action = na.omit)
           data$s.mod <- data[,mod]-max(unique(data[,mod]),na.rm=TRUE)
           m.cat1<-lm(values$form2,data, na.action = na.omit)
 
       }
       else{
 
-        if(input$manual == FALSE){
+        # if(input$manual == FALSE){
       values$form2<-as.formula(paste(dep2,cov,focmod2))
       values$model2<-as.formula(paste(dep2,cov,focmod2))
-        }
+        # }
 
    }
 
 # MAKING RoS PLOT ---------------------------------------------------------
 observeEvent(input$rosgo, {
+  if(input$cat == FALSE){
 df.ros<-dftrue
 df.ros[,foc] <- scale(df.ros[,foc])
 df.ros[,mod] <- scale(df.ros[,mod])
@@ -703,126 +795,184 @@ else{
       geom_vline(xintercept = min(ros[which(ros$significance=="sig" & ros$sign=="pos"),"hyp.Z"]), linetype="dashed")
   }
 }
-      
 
 values$rosplot<-rosplot
-
+}else{return("Regions of significance plot cannot be created for a categorical moderator")}
 })
 
 # Define Dynamic Plots ----------------------------------------------------
 
       # data[,mod]<-data[,mod]-modlevel
 
-      values$resfoc.form1<-as.formula((gsub(paste0(foc," \\+ "),"",format(values$form))))
-      values$resdv.form<-as.formula((gsub(paste0("\\+ ",mod," \\* ",foc),"",format(values$resfoc.form1))))
-      values$resfoc.form<-as.formula(paste(foc,"~",sub(".*~ ","",format(values$resdv.form))))
+      # values$resfoc.form1<-as.formula((gsub(paste0(foc," \\+ "),"",format(values$form))))
+      # values$resdv.form<-as.formula((gsub(paste0("\\+ ",mod," \\* ",foc),"",format(values$resfoc.form1))))
+      # values$resfoc.form<-as.formula(paste(foc,"~",sub(".*~ ","",format(values$resdv.form))))
 
       dfpoints<-as.data.frame(cbind(data[,foc],glm(values$form,data, na.action = na.omit,family="gaussian")$y,m$fitted.values))
       colnames(dfpoints)<-c("pred","y","fitted")
 
-      min2sdlab<-paste0("-2 SD")
-      min1sdlab<-paste0("-1 SD")
-      meanlab<-paste0("Mean\n")
-      plus1sdlab<-paste0("+1 SD")
-      plus2sdlab<-paste0("+2 SD")
+      # min2sdlab<-paste0("-2 SD")
+      # min1sdlab<-paste0("-1 SD")
+      # meanlab<-paste0("Mean\n")
+      # plus1sdlab<-paste0("+1 SD")
+      # plus2sdlab<-paste0("+2 SD")
 
-      if(input$static == FALSE) {
-      #Begin new code for simulating estimates using simcf
-        focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
-        df.plot<-as.data.frame(matrix(nrow = length(focal.seq),ncol=3))
-        for (j in 1:length(focal.seq)){
-          data$s.foc<-data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
-          data$s.mod<-data[,mod]-input$modlevel
-          lm<-lm(values$form2,data, na.action = na.omit)
-          df.plot$pe[j]<-lm$coefficients["(Intercept)"]
-          df.plot$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
-          df.plot$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
-          df.plot$pe[j]<-lm$coefficients["(Intercept)"]
-          df.plot$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
-          df.plot$focal.seq<-focal.seq
-        }
-
-    #This looks up the color corresponding to the p-value associated with the PE of my focal predictor, and stores it in the dataframe for use in ggplot.
-    df.plot$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-    #Finally, I build the graphic using ggplot2, commented below:
-    plot.lin <- interactiv.plot(data=data,dfpoints=dfpoints,plotdf=df.plot)
-
-    if(values$co <= max(df.plot$focal.seq) & values$co >= min(df.plot$focal.seq))
-       {
-      plot.lin <- plot.lin +
-        annotate("point", x = values$co, y =
-                 # as.numeric(mode(df.plot$pe)),
-                   (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
-               color= "black", fill = "orange", size = 3, shape = 23)
-    }
-
-    values$df.plot<-df.plot
-plot.lin
-      }
+      # if(input$static == FALSE) {
+#       #Begin new code for simulating estimates using simcf
+#         focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
+#         df.plot<-as.data.frame(matrix(nrow = length(focal.seq),ncol=3))
+#         for (j in 1:length(focal.seq)){
+#           data$s.foc<-data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
+#           data$s.mod<-data[,mod]-input$modlevel
+#           lm<-lm(values$form2,data, na.action = na.omit)
+#           df.plot$pe[j]<-lm$coefficients["(Intercept)"]
+#           df.plot$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
+#           df.plot$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
+#           df.plot$pe[j]<-lm$coefficients["(Intercept)"]
+#           df.plot$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
+#           df.plot$focal.seq<-focal.seq
+#         }
+# 
+#     #This looks up the color corresponding to the p-value associated with the PE of my focal predictor, and stores it in the dataframe for use in ggplot.
+#     df.plot$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
+# 
+#     #Finally, I build the graphic using ggplot2, commented below:
+#     plot.lin <- interactiv.plot(data=data,dfpoints=dfpoints,plotdf=df.plot)
+# 
+#     if(values$co <= max(df.plot$focal.seq) & values$co >= min(df.plot$focal.seq))
+#        {
+#       plot.lin <- plot.lin +
+#         annotate("point", x = values$co, y =
+#                  # as.numeric(mode(df.plot$pe)),
+#                    (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
+#                color= "black", fill = "orange", size = 3, shape = 23)
+#     }
+# 
+#     values$df.plot<-df.plot
+# plot.lin
+      # }
 
 #Below is similar code, applied instead to creating a static graphic using the principles of small multiples.
 #This is similar to the pick-a-point approach of probing and graphing interactions, though offers graphics across a greater range than 3 points (now we do 5).
 
-else{
+# else{
 
 # Define Static Plots ------------------------------------------------------
   if(input$cat==TRUE){
 
+    focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
+    mod.seq <- na.omit(unique(data[,mod]))
+    
+    cats<-c(input$catsm1,input$catsm2) #TO BE CONTINUED
+    modlevel<- list()
+    ppoints<-as.data.frame(matrix(nrow=length(focal.seq),ncol=3))
+    colnames(ppoints)<-c("pe","lower","upper")
+    for (k in 1:length(mod.seq)){
+
+      if(input$cat==FALSE)(data$s.mod<-data[,mod]-sd(data[,mod], na.rm=TRUE)*mod.seq[k])
+      if(input$cat==TRUE)(data$s.mod<-values$s.mod<-data[,mod]-mod.seq[k])
+      for (j in 1:length(focal.seq)){
+        data$s.foc <- data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
+
+        lm<-lm(values$form2,data, na.action = na.omit)
+        ppoints$pe[j]<-lm$coefficients["(Intercept)"]
+        ppoints$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
+        ppoints$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
+        ppoints$pe[j]<-lm$coefficients["(Intercept)"]
+        ppoints$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
+        ppoints$focal.seq<-focal.seq
+        leveltemp<-rep(paste0("b = ",
+                              round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
+                              round(confint(lm)["s.foc","2.5 %"],2),", ",
+                              round(confint(lm)["s.foc","97.5 %"],2),"]"))
+      }
+      if(input$cat==FALSE)(ppoints$level<-paste0(mod.seq[k]," SD\n",leveltemp))
+      if(input$cat==TRUE)(ppoints$level<-paste0("Category ",mod.seq[k],"\n",leveltemp))
+      modlevel[[k]]<-values$ppoints<-ppoints
+    }
+    data$s.mod<-data[,mod]
+    data$s.foc<-data[,foc]
+    
+    if(input$cat==FALSE){
+      df.staticplot<-as.data.frame(rbind(modlevel[[1]],
+                                       modlevel[[2]],
+                                       modlevel[[3]],
+                                       modlevel[[4]],
+                                       modlevel[[5]]))
+    }
+    if(input$cat==TRUE){
+      #Will need to revise this when coding multi-category interactions
+      df.staticplot<-as.data.frame(rbind(modlevel[[1]],
+                                         modlevel[[2]]))
+    }
+    
+    df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
+    df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
+    df.staticplot$col[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-bluespal["less05"]
+    df.staticplot$col[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-bluespal["less01"]
+    df.staticplot$col[df.staticplot$p.val<=.001]<-bluespal["less001"]
+    
+    df.staticplot$greycol[df.staticplot$p.val>.10]<-greyspal["greater10"]
+    df.staticplot$greycol[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-greyspal["less10"]
+    df.staticplot$greycol[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-greyspal["less05"]
+    df.staticplot$greycol[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-greyspal["less01"]
+    df.staticplot$greycol[df.staticplot$p.val<=.001]<-greyspal["less001"]
+    
+    values$dfplot<-df.staticplot
     # Create Static Plots
 
     #Create static plots for non-two-part models
 
-      df.plot.cat0<-data.frame(
-        focal.seq, #focal hypothetical values
-        focal.hyp.Ysims.cat0$pe, #point estimates
-        focal.hyp.Ysims.cat0$lower, #simulated lower limits
-        focal.hyp.Ysims.cat0$upper, #simulated upper limits
-        rep(paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3))),
-        rep(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-      #Add column names
-      colnames(df.plot.cat0)<-c("focal.seq","pe","lower","upper","level","p.val")
-      df.plot.cat0$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-      df.plot.cat1<-data.frame(
-        focal.seq, #focal hypothetical values
-        focal.hyp.Ysims.cat1$pe, #point estimates
-        focal.hyp.Ysims.cat1$lower, #simulated lower limits
-        focal.hyp.Ysims.cat1$upper, #simulated upper limits
-        rep(paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))),
-        rep(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
-      #Add column names
-      colnames(df.plot.cat1)<-c("focal.seq","pe","lower","upper","level","p.val")
-      df.plot.cat1$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
-
-
-      df.staticplot<-as.data.frame(rbind(df.plot.cat0,df.plot.cat1))
-
-      df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
-      df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
-      df.staticplot$col[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-bluespal["less05"]
-      df.staticplot$col[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-bluespal["less01"]
-      df.staticplot$col[df.staticplot$p.val<=.001]<-bluespal["less001"]
-
-      df.staticplot$greycol[df.staticplot$p.val>.10]<-greyspal["greater10"]
-      df.staticplot$greycol[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-greyspal["less10"]
-      df.staticplot$greycol[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-greyspal["less05"]
-      df.staticplot$greycol[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-greyspal["less01"]
-      df.staticplot$greycol[df.staticplot$p.val<=.001]<-greyspal["less001"]
-
-      values$dfplot<-df.staticplot
-
-      dfpoints$p.val[data[,mod]== min(unique(data[,mod]),na.rm=TRUE)]<-round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3)
-      dfpoints$p.val[data[,mod]== max(unique(data[,mod]),na.rm=TRUE)] <-round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3)
-
-      dfpoints$level[data[,mod]== min(unique(data[,mod]),na.rm=TRUE)]<-paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3))
-      dfpoints$level[data[,mod]== max(unique(data[,mod]),na.rm=TRUE)]<-paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))
-
-      dfpoints<-na.omit(dfpoints)
-
-      dfpoints$level <- factor(dfpoints$level, levels = c(paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3)),
-                                                          paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))))
-
+      # df.plot.cat0<-data.frame(
+      #   focal.seq, #focal hypothetical values
+      #   focal.hyp.Ysims.cat0$pe, #point estimates
+      #   focal.hyp.Ysims.cat0$lower, #simulated lower limits
+      #   focal.hyp.Ysims.cat0$upper, #simulated upper limits
+      #   rep(paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3))),
+      #   rep(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
+      # #Add column names
+      # colnames(df.plot.cat0)<-c("focal.seq","pe","lower","upper","level","p.val")
+      # # df.plot.cat0$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
+      # 
+      # df.plot.cat1<-data.frame(
+      #   focal.seq, #focal hypothetical values
+      #   focal.hyp.Ysims.cat1$pe, #point estimates
+      #   focal.hyp.Ysims.cat1$lower, #simulated lower limits
+      #   focal.hyp.Ysims.cat1$upper, #simulated upper limits
+      #   rep(paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))),
+      #   rep(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],length(focal.seq)))
+      # #Add column names
+      # colnames(df.plot.cat1)<-c("focal.seq","pe","lower","upper","level","p.val")
+      # # df.plot.cat1$col<-dfcol[which(round(dfcol$pvals,20)==round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"]),20),"pcols"]
+      # 
+      # 
+      # df.staticplot<-as.data.frame(rbind(df.plot.cat0,df.plot.cat1))
+      # 
+      # df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
+      # df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
+      # df.staticplot$col[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-bluespal["less05"]
+      # df.staticplot$col[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-bluespal["less01"]
+      # df.staticplot$col[df.staticplot$p.val<=.001]<-bluespal["less001"]
+      # 
+      # df.staticplot$greycol[df.staticplot$p.val>.10]<-greyspal["greater10"]
+      # df.staticplot$greycol[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-greyspal["less10"]
+      # df.staticplot$greycol[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-greyspal["less05"]
+      # df.staticplot$greycol[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-greyspal["less01"]
+      # df.staticplot$greycol[df.staticplot$p.val<=.001]<-greyspal["less001"]
+      # 
+      # values$dfplot<-df.staticplot
+      # 
+      # dfpoints$p.val[data[,mod]== min(unique(data[,mod]),na.rm=TRUE)]<-round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3)
+      # dfpoints$p.val[data[,mod]== max(unique(data[,mod]),na.rm=TRUE)] <-round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3)
+      # 
+      # dfpoints$level[data[,mod]== min(unique(data[,mod]),na.rm=TRUE)]<-paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3))
+      # dfpoints$level[data[,mod]== max(unique(data[,mod]),na.rm=TRUE)]<-paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))
+      # 
+      # dfpoints<-na.omit(dfpoints)
+      # 
+      # dfpoints$level <- factor(dfpoints$level, levels = c(paste0("0\nBeta = ",round(lm.beta(m.cat0)[foc],3),"\np = ",round(summary(m.cat0)$coefficients[foc,"Pr(>|t|)"],3)),
+      #                                                     paste0("1\nBeta = ",round(lm.beta(m.cat1)[foc],3),"\np = ",round(summary(m.cat1)$coefficients[foc,"Pr(>|t|)"],3))))
+      # 
       values$dfpoints<-dfpoints
 
       df.colstemp<-df.staticplot[c("level","col","greycol")]
@@ -831,8 +981,7 @@ else{
       df.cols$greycolslight<-sapply(df.cols$greycol, function(i) {df.cols$greycol<- lighten(i,pct=0.50)})
       df.cols<-as.data.frame(df.cols)
       values$df.cols<-df.cols
-      #
-      df.staticplot<-df.staticplot[57:225,]
+      values$data<-data
       values$df.staticplot<-df.staticplot
 
       staticplot<-interactiv.plot2(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
@@ -847,7 +996,8 @@ else{
       }
 
       values$plot<-staticplot; staticplot
-  }
+  }#end input$cat==TRUE
+      
 else{
 
 # Create Static Plots
@@ -970,7 +1120,7 @@ else{
     values$plot<-staticplot; staticplot
   #end of else statement for non-two-part static plots
 }#end of else statement for defining static plots
-}#End of else statement defining continuous moderator static plot
+# }#End of else statement defining continuous moderator static plot
    })#signifies end of output$modplot!
   output$results <- renderTable({
     if (is.null(input$file1))
@@ -978,7 +1128,9 @@ else{
 
     m <- values$m
 
-cbind(names(m$coefficients),round(summary(m)$coefficients,3))
+resultstable<-cbind(names(m$coefficients),c(" ",round(QuantPsyc::lm.beta(m),3)),round(summary(m)$coefficients,3))
+colnames(resultstable)<-c(" ","Beta","b","SE","t","Pr(>|t|)")
+resultstable
   })
 
   output$resultstitle<-reactive({
@@ -1034,7 +1186,8 @@ return(NULL)
 
 
 
-}) #end of eventReactive
+})
+#end of eventReactive
 output$datashow <- renderTable({
   if (is.null(input$file1))
     return(NULL)
@@ -1048,11 +1201,11 @@ output$plotdata <- renderTable({
   values$dfplot
 })
 
-output$test.tab <- renderText({
+output$test.tab <- renderPrint({
   if (is.null(input$file1))
     return(NULL)
   # paste(confint(values$m.repar)["C","2.5%"],confint(values$m.repar)["C","97.5%"])
-  values$divides
+  values$ppoints
   # values$df.plot
 
 })
@@ -1077,15 +1230,16 @@ output$plot.final.ros <- renderPlot({
     return(NULL)
   plotfinal.ros<-values$rosplot +
     xlab(input$xaxislab.ros) +
-    ylab(input$yaxislab.ros)
+    ylab(input$yaxislab.ros) +
+    ggtitle(input$rostitle)
   values$plotfinal.ros<-plotfinal.ros
   plotfinal.ros
 })
+
 output$plot.final <- renderPlot({
   if (is.null(input$file1))
     return(NULL)
 
-  # values$df.plot
   plotfinal<-values$plot +
     xlab(input$xaxislab) +
     ylab(input$yaxislab) +
