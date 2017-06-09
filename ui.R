@@ -70,7 +70,7 @@ shinyUI(fluidPage(
                ),
                downloadButton('downloadPlot.final', 'Download Plot')
       ),
-      tabPanel("Marginal Effects",
+      tabPanel("Marginal Effects Plot",
                column(8,
                       uiOutput("ui.rosgo"),
                       plotOutput("plot.final.ros"),
@@ -83,13 +83,13 @@ shinyUI(fluidPage(
                column(4,
                       tableOutput("rostest")
                )),
-      tabPanel("Plot Data",
+      tabPanel("Plot Estimates",
                column(8,
                       tableOutput("plotdata")),
                column(4,
                       downloadButton('downloadEst', 'Download Plot Data'))
       ),
-      tabPanel("Data",tableOutput("datashow"))
+      tabPanel("Raw Data",tableOutput("datashow"))
 
       )#tabsetPanel
       ) #mainpanel

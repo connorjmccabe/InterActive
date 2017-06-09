@@ -1,6 +1,7 @@
 #Server
 
 options(digits=9)
+options(warn=-1) #Suppress Warnings
 options(shiny.maxRequestSize=20*1024^2) #max file size = 20 MB
 require(ggplot2)
 require(RColorBrewer)
@@ -35,21 +36,6 @@ extract <- function(MOD, regressor) {
   tmp[4] <- confint(MOD)[regressor,2] #same for upper limit
   return(tmp)
 }
-
-pvals<-round((seq(0,1,.001))**3,9)
-colfunc <- colorRampPalette(c("#0016A8", "#CFD2EE"))
-whites<-rep("#CFD2EE",500)
-pcols<-c(colfunc(501),whites)
-seq<-(seq(1,length(pvals),1))
-
-pcolslight <- sapply(pcols, function(i) {
-  pcols<- lighten(i,pct=0.50)
-})
-
-bluespal<-c("#08306B","#2171B5","#4292C6","#9ECAE1","#C6DBEF")
-greyspal<-c("#000000","#252525","#525252","#737373","#969696")
-names(bluespal)<-c("less001","less01","less05","less10","greater10")
-names(greyspal)<-c("less001","less01","less05","less10","greater10")
 
 # END HELPER FUNCTIONS ----------------------------------------------------
 
@@ -377,52 +363,8 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
       if (is.null(input$file1))
         return(NULL)
 
-#Defining plot template functions
- 
-    #for continuous moderator variables   
+#Defining plot template function
     interactiv.plot<-function(data, dfpoints, plotdf){
-      geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
-        geom_ribbon(data=plotdf, aes(x=focal.seq, y=pe, ymin = lower, ymax = upper, fill = level), alpha = .25) +
-        geom_line(data = plotdf, aes(focal.seq, pe, fill=level, color=level), size=1) +
-        
-        ylim(min(data[,dv]-2*sd(data[,dv],na.rm = TRUE)),max(data[,dv]+2*sd(data[,dv],na.rm = TRUE))) +
-        
-        xlim(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE)) +
-        
-        #thematic specifications of my graphic
-        theme(text=element_text(family="Helvetica",size=12, color="black"),
-              legend.position="none",
-              panel.background = element_blank(),
-              legend.background = element_rect(fill = "white"),
-              legend.title=element_blank(),
-              legend.key = element_rect(fill = "white"),
-              panel.grid.minor = element_blank(),
-              axis.text.x=element_text(colour="black"),
-              axis.title.x=element_text(size=14),
-              axis.text.y=element_text(colour="black"),
-              axis.title.y=element_text(size=14),
-              panel.grid.major = element_line(colour="#C0C0C0"),
-              plot.background=element_rect(fill='white')) +
-        
-        labs(fill = mod, color = mod, linetype=mod) +
-
-        labs(x = foc, y = dv) +
-        
-        coord_cartesian() +
-        
-        ggtitle(paste0("Level of Moderator (",mod,")")) +
-        
-        geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
-        
-        facet_grid(~level) +
-        scale_color_manual(values=df.cols$col) +
-        scale_fill_manual(values=df.cols$colslight) +
-        
-        theme(plot.title = element_text(family="Helvetica", face="bold", size=14, hjust=0, color="black"))
-    }
-    
-#For categorical moderator variables
-    interactiv.plot2<-function(data, dfpoints, plotdf){
       ggplot() +
         
         geom_point(data=dfpoints, aes(x=pred,y=y),size = .75, alpha = .5) +
@@ -455,8 +397,6 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         
         ggtitle(paste0("Level of Moderator (",mod,")")) +
         
-        #I provide horizonal lines at the observed minimum and maximum of my outcome  variable. This helps the reader understand whether they are extropolating their prediction lines outside the range of observed data. Again, I will be building this out to come up with an effective solution for doing this with focal and moderator variables as well.
-        
         geom_hline(yintercept=c(max(data[,dv], na.rm = TRUE),min(data[,dv], na.rm = TRUE)),linetype=2) +
         
         facet_grid(~level) +
@@ -465,7 +405,10 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         
         theme(plot.title = element_text(family="Helvetica", face="bold", size=14, hjust=0, color="black"))
     }
-    
+
+
+# Analyses code -----------------------------------------------------------
+
       data<-df() #make a copy of the data for variable rescaling and analyses
       dftrue<-df() #retain an original copy
       
@@ -510,6 +453,8 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
       
       cov<-paste(input$covars, collapse=" + ")
       
+      values$covars<-input$covars
+      
       if (input$poly == "quad"){
         focmod<-paste("+",
                       foc,"+",
@@ -553,6 +498,7 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
                        "s.mod", "+",
                        "I(","s.foc","^2)","*",
                        "s.mod")
+        
       }
       else{
         focmod2<-paste("+","s.foc","+","s.mod","+","s.foc","*","s.mod")
@@ -572,14 +518,18 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         
       }
       else{
-        
+        values$dep2<-dep2
+        values$cov<-cov
+        values$focmod2<-focmod2
         values$form2<-as.formula(paste(dep2,cov,focmod2))
         values$model2<-as.formula(paste(dep2,cov,focmod2))
         
       }
-      
-      # MAKING RoS PLOT ---------------------------------------------------------
-        if(input$cat == FALSE){
+
+
+# Regions-of-significance analyses and marginal effects plot code ---------------------------------------------------------
+
+          if(input$cat == FALSE){
           df.ros<-dftrue
           df.ros[,foc] <- scale(df.ros[,foc])
           df.ros[,mod] <- scale(df.ros[,mod])
@@ -644,161 +594,161 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
           values$rosplot<-rosplot
         }
       
-      dfpoints<-as.data.frame(cbind(data[,foc],glm(values$form,data, na.action = na.omit,family="gaussian")$y,m$fitted.values))
-      colnames(dfpoints)<-c("pred","y","fitted")
-      
-
-# Creating plot estimates -------------------------------------------------
-
-      if(input$cat==TRUE){
+# Creating plot data (simple slope estimates and confidence regions) for each small multiple --------------
         
-        focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
-        mod.seq <- na.omit(unique(data[,mod]))
+        if(input$poly=="quad"){focal.seq <- sort(c(-1,0,1,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1)))}
+        else(focal.seq <- sort(c(-1,0,1,values$co,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))))
+        sm1<-as.numeric(input$sm1)*(sd(data[,mod], na.rm=TRUE))
+        sm2<-as.numeric(input$sm2)*(sd(data[,mod], na.rm=TRUE))
+        sm3<-as.numeric(input$sm3)*(sd(data[,mod], na.rm=TRUE))
+        sm4<-as.numeric(input$sm4)*(sd(data[,mod], na.rm=TRUE))
+        sm5<-as.numeric(input$sm5)*(sd(data[,mod], na.rm=TRUE))
         
-        modlevel<- list()
-        ppoints<-as.data.frame(matrix(nrow=length(focal.seq),ncol=3))
-        colnames(ppoints)<-c("pe","lower","upper")
+        xi<-rep(0,length(values$m$coefficients))
+        
+        matxi1<-as.data.frame(matrix(xi,length(focal.seq),length(xi)))
+        names(matxi1)<-names(values$m$coefficients)
+        if(length(input$covars)==1){
+          covmeans<-mean(data[,input$covars],na.rm=TRUE)
+          matxi1[,input$covars]<-rep(covmeans,length(focal.seq))
+          }
+          else{
+            covmeans<-lapply(data[,input$covars],mean, na.rm=TRUE)
+            for (i in 1:length(covmeans)){matxi1[,input$covars[i]]<-rep(covmeans[i],ncol(matxi1))}
+          }
+        values$covmeans<-covmeans
+        matxi1[,foc]<-focal.seq
+        matxi1$`(Intercept)`<-rep(1,nrow(matxi1))
+        values$matxi1<-matxi1
+        matxi2<-matxi3<-matxi4<-matxi5<-matxi1
+        if(input$cat ==TRUE){
+        mod.seq<-sort(unique(data[,mod]))
+        matxi1[,mod]<-rep(mod.seq[1],nrow(matxi1))
+        matxi2[,mod]<-rep(mod.seq[2],nrow(matxi2))
+        matxi<-rbind(matxi1,matxi2)
+        }
+        else{
+          mod.seq <- c(as.numeric(sm1),
+                       as.numeric(sm2),
+                       as.numeric(sm3),
+                       as.numeric(sm4),
+                       as.numeric(sm5))
+          
+        matxi1[,mod]<-rep(mod.seq[1],nrow(matxi1))
+        matxi2[,mod]<-rep(mod.seq[2],nrow(matxi2))
+        matxi3[,mod]<-rep(mod.seq[3],nrow(matxi3))
+        matxi4[,mod]<-rep(mod.seq[4],nrow(matxi4))
+        matxi5[,mod]<-rep(mod.seq[5],nrow(matxi5))
+        
+        matxi<-rbind(matxi1,matxi2,matxi3,matxi4,matxi5)
+        }
+        
+        matxi[,paste0(foc,":",mod)]<-matxi[,foc]*as.numeric(matxi[,mod])
+        Xmat<-as.data.frame(cbind(rep(1,nrow(values$m$model)),
+                              values$m$model[,-1]))
+        colnames(Xmat)<-c("(Intercept)",colnames(values$m$model[,-1]))
+        Xmat[,paste0(foc,":",mod)]<-(Xmat[,foc])*(as.numeric(Xmat[,mod]))
+        
+        if(input$poly == "quad") {
+          matxi[,paste0("I(",foc,"^2)")]<-matxi[,foc]*matxi[,foc]
+          matxi[,paste0("I(",foc,"^2):",mod)]<-matxi[,foc]*matxi[,foc]*as.numeric(matxi[,mod])
+
+          Xmat[,paste0("I(",foc,"^2)")]<-(Xmat[,foc])*(Xmat[,foc])
+          Xmat[,paste0("I(",foc,"^2):",mod)]<-as.numeric(Xmat[,mod])*(Xmat[,foc])*(Xmat[,foc])
+        }
+        
+        Xmat<-as.matrix(Xmat)
+        
+        values$matxi<-matxi
+        values$Xmat<-Xmat
+        matquant<-solve((t(Xmat) %*% Xmat))
+        values$matquant<-matquant
+        y<-values$m$model[,1]
+        
+        A<-solve((t(Xmat) %*% Xmat))
+        values$A<-A
+        beta <- A %*% t(Xmat) %*%  y
+        values$beta<-beta
+        resids <- y - (Xmat %*% beta)
+        values$resids
+        sig<-sqrt(sum(resids^2) / (nrow(Xmat)-ncol(Xmat)))
+        values$sig
+        
+        pes<-as.matrix(matxi)%*%beta
+        values$pes<-pes
+        SEys<-diag(sig*(sqrt(as.matrix(matxi)%*%matquant%*%t(as.matrix(matxi)))))#Warning is generated because of square-rooting negative values in the off-diagonals of the covariance matrix. This is OK since we are only taking the diagonals of this matrix, which will always be positive.
+        fac <- qt(.975,values$m$df.residual)
+        ylower<-pes - fac*SEys
+        yupper<-pes + fac*SEys
+        
+        df.staticplot<-as.data.frame(cbind(focal.seq,matxi[,mod],pes,ylower,yupper))
+        names(df.staticplot)<-c("focal.seq","modlevel","pe","lower","upper")
+        df.staticplot<-as.data.frame(df.staticplot)
+  
+          pval<-level<-list()
+          data$s.foc<-data[,foc]
         for (k in 1:length(mod.seq)){
           
-          if(input$cat==FALSE)(data$s.mod<-data[,mod]-sd(data[,mod], na.rm=TRUE)*mod.seq[k])
-          if(input$cat==TRUE)(data$s.mod<-values$s.mod<-data[,mod]-mod.seq[k])
-          for (j in 1:length(focal.seq)){
-            data$s.foc <- data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
-            
-            lm<-lm(values$form2,data, na.action = na.omit)
-            ppoints$pe[j]<-lm$coefficients["(Intercept)"]
-            ppoints$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
-            ppoints$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
-            ppoints$pe[j]<-lm$coefficients["(Intercept)"]
-            ppoints$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
-            ppoints$focal.seq<-focal.seq
-            leveltemp<-rep(paste0("b = ",
-                                  round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
-                                  round(confint(lm)["s.foc","2.5 %"],2),", ",
-                                  round(confint(lm)["s.foc","97.5 %"],2),"]"))
+          data$s.mod<-data[,mod]-mod.seq[k]
+          lm<-lm(values$form2,data, na.action = na.omit)
+          pval[[k]]<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
+          if(input$poly=="lin"){
+          leveltemp<-rep(paste0("\nb = ",
+                                round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
+                                round(confint(lm)["s.foc","2.5 %"],2),", ",
+                                round(confint(lm)["s.foc","97.5 %"],2),"]"),length(focal.seq))
+          }else(leveltemp<-rep("",length(focal.seq)))
+          if(input$cat==TRUE){level[[k]]<-paste0("Category ",mod.seq[k],leveltemp)}
+          else(level[[k]]<-paste0(mod.seq[k]/sd(data[,mod],na.rm=TRUE)," SD",leveltemp))
           }
-          if(input$cat==FALSE)(ppoints$level<-paste0(mod.seq[k]," SD\n",leveltemp))
-          if(input$cat==TRUE)(ppoints$level<-paste0("Category ",mod.seq[k],"\n",leveltemp))
-          modlevel[[k]]<-values$ppoints<-ppoints
-        }
-        data$s.mod<-data[,mod]
-        data$s.foc<-data[,foc]
         
-        if(input$cat==FALSE){
-          df.staticplot<-as.data.frame(rbind(modlevel[[1]],
-                                             modlevel[[2]],
-                                             modlevel[[3]],
-                                             modlevel[[4]],
-                                             modlevel[[5]]))
-        }
-        if(input$cat==TRUE){
-
-          df.staticplot<-as.data.frame(rbind(modlevel[[1]],
-                                             modlevel[[2]]))
-        }
-        
-        df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
-        df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
-        df.staticplot$col[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-bluespal["less05"]
-        df.staticplot$col[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-bluespal["less01"]
-        df.staticplot$col[df.staticplot$p.val<=.001]<-bluespal["less001"]
-        
-        df.staticplot$greycol[df.staticplot$p.val>.10]<-greyspal["greater10"]
-        df.staticplot$greycol[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-greyspal["less10"]
-        df.staticplot$greycol[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-greyspal["less05"]
-        df.staticplot$greycol[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-greyspal["less01"]
-        df.staticplot$greycol[df.staticplot$p.val<=.001]<-greyspal["less001"]
-        
-        values$dfplot<-df.staticplot
-        
-# Create Static Plots
-    
-        values$dfpoints<-dfpoints
-        
-        df.colstemp<-df.staticplot[c("level","col","greycol")]
-        df.cols<-df.colstemp[!duplicated(df.colstemp$level), ]
-        df.cols$colslight<-sapply(df.cols$col, function(i) {df.cols$col<- lighten(i,pct=0.50)})
-        df.cols$greycolslight<-sapply(df.cols$greycol, function(i) {df.cols$greycol<- lighten(i,pct=0.50)})
-        df.cols<-as.data.frame(df.cols)
-        values$df.cols<-df.cols
-        values$data<-data
-        values$df.staticplot<-df.staticplot
-        
-        staticplot<-interactiv.plot2(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
-        
-        if(values$co <= max(df.staticplot$focal.seq) & values$co >= min(df.staticplot$focal.seq))
-        {
-          staticplot <- staticplot +
-            annotate("point", x = values$co, y =
-                       (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
-                     color= "black", fill = brewer.pal(9,"Greys")[2], size = 2, shape = 23)
-        }
-        
-        values$plot<-staticplot; staticplot
-      }#end input$cat==TRUE
+        df.staticplot$p.val<-do.call(c,pval)
+        df.staticplot$level<-do.call(c,level)
+      values$df.staticplot<- df.staticplot
       
-
-# Creating Plot for continuous focal and moderator variables --------------
-
+      #Define bluescale and greyscale color palletes
+      bluespal<-c("#08306B","#2171B5","#4292C6","#9ECAE1","#C6DBEF")
+      greyspal<-c("#000000","#252525","#525252","#737373","#969696")
+      names(bluespal)<-c("less001","less01","less05","less10","greater10")
+      names(greyspal)<-c("less001","less01","less05","less10","greater10")
+      
+      if(input$poly == "quad"){
+        df.staticplot$col<-rep(bluespal["less05"],nrow(df.staticplot))
+        df.staticplot$greycol<-rep(greyspal["less05"],nrow(df.staticplot))
+        }
       else{
-        
-        
-        
-        #SET UP DATA FRAMES
-        
-        focal.seq <- c(0,seq(min(data[,foc], na.rm = TRUE),max(data[,foc], na.rm = TRUE),.1))
-        mod.seq <- c(as.numeric(input$sm1),
-                     as.numeric(input$sm2),
-                     as.numeric(input$sm3),
-                     as.numeric(input$sm4),
-                     as.numeric(input$sm5))
-        modlevel<- list()
-        ppoints<-as.data.frame(matrix(nrow=length(focal.seq),ncol=3))
-        colnames(ppoints)<-c("pe","lower","upper")
-        for (k in 1:length(mod.seq)){
-          
-          data$s.mod<-data[,mod]-sd(data[,mod], na.rm=TRUE)*mod.seq[k]
-          for (j in 1:length(focal.seq)){
-            data$s.foc<-data[,foc]-sd(data[,foc], na.rm=TRUE)*focal.seq[j]
-            
-            lm<-lm(values$form2,data, na.action = na.omit)
-            ppoints$pe[j]<-lm$coefficients["(Intercept)"]
-            ppoints$lower[j]<-confint(lm)["(Intercept)","2.5 %"]
-            ppoints$upper[j]<-confint(lm)["(Intercept)","97.5 %"]
-            ppoints$pe[j]<-lm$coefficients["(Intercept)"]
-            ppoints$p.val<-rep(summary(lm)$coefficients["s.foc","Pr(>|t|)"],length(focal.seq))
-            ppoints$focal.seq<-focal.seq
-            leveltemp<-rep(paste0("b = ",
-                                  round(lm$coefficients["s.foc"],2),"\n95% CI =\n[",
-                                  round(confint(lm)["s.foc","2.5 %"],2),", ",
-                                  round(confint(lm)["s.foc","97.5 %"],2),"]"))
-          }
-          ppoints$level<-paste0(mod.seq[k]," SD\n",leveltemp)
-          modlevel[[k]]<-ppoints
-        }
-        data$s.mod<-data[,mod]
-        data$s.foc<-data[,foc]
-        
-        df.staticplot<-as.data.frame(rbind(modlevel[[1]],
-                                           modlevel[[2]],
-                                           modlevel[[3]],
-                                           modlevel[[4]],
-                                           modlevel[[5]]))
-        
+
         df.staticplot$col[df.staticplot$p.val>.10]<-bluespal["greater10"]
         df.staticplot$col[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-bluespal["less10"]
         df.staticplot$col[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-bluespal["less05"]
         df.staticplot$col[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-bluespal["less01"]
         df.staticplot$col[df.staticplot$p.val<=.001]<-bluespal["less001"]
-        
+
         df.staticplot$greycol[df.staticplot$p.val>.10]<-greyspal["greater10"]
         df.staticplot$greycol[df.staticplot$p.val<=.10 & df.staticplot$p.val>.05]<-greyspal["less10"]
         df.staticplot$greycol[df.staticplot$p.val<=.05 & df.staticplot$p.val>.01]<-greyspal["less05"]
         df.staticplot$greycol[df.staticplot$p.val<=.01 & df.staticplot$p.val>.001]<-greyspal["less01"]
         df.staticplot$greycol[df.staticplot$p.val<=.001]<-greyspal["less001"]
+        }
         
-        values$dfplot<-df.staticplot
+      values$dfplot<-df.staticplot
+      
+# End Plot Data Creation Code ---------------------------------------------   
+  
+
+# Creating a dataframe containing observed data for each small multiple---------------------------
+
+        modindex<- as.data.frame(unique(df.staticplot[c("modlevel","p.val","level")]))
+        values$modindex<-modindex
         
+        #Define a reduced data frame for display of observed data
+        dfpoints<-as.data.frame(cbind(data[,foc],glm(values$form,data, na.action = na.omit,family="gaussian")$y,m$fitted.values))
+        colnames(dfpoints)<-c("pred","y","fitted")
+        
+if(input$cat==FALSE){   
+  
+  modindex$scalelevel<-c(input$sm1,input$sm2,input$sm3,input$sm4,input$sm5)
+  
         divides<-c(((as.numeric(input$sm2) - as.numeric(input$sm1))/2),
                    ((as.numeric(input$sm3) - as.numeric(input$sm2))/2),
                    ((as.numeric(input$sm4) - as.numeric(input$sm3))/2),
@@ -806,35 +756,43 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         divides<-abs(divides)
         
         values$divides<-divides
-        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-round(modlevel[[1]]$p.val[1],3)
-        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])] <-round(modlevel[[2]]$p.val[1],3)
-        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-round(modlevel[[3]]$p.val[1],3)
-        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-round(modlevel[[4]]$p.val[1],3)
-        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-round(modlevel[[5]]$p.val[1],3)
+        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-round(modindex$p.val[which(modindex$modlevel== sm1)],3)
+        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])] <-round(modindex$p.val[which(modindex$modlevel== sm2)],3)
+        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-round(modindex$p.val[which(modindex$modlevel== sm3)],3)
+        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-round(modindex$p.val[which(modindex$modlevel== sm4)],3)
+        dfpoints$p.val[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-round(modindex$p.val[which(modindex$modlevel== sm5)],3)
         
     #SM1
-        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modlevel[[1]]$level[1]
+        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modindex$level[which(modindex$modlevel== sm1)]
 
     #SM2
-        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modlevel[[2]]$level[1]
-        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-modlevel[[3]]$level[1]
-        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-modlevel[[4]]$level[1]
-        dfpoints$level[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-modlevel[[5]]$level[1]
+        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm1)+divides[1])]<-modindex$level[which(modindex$modlevel== sm2)]
+        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm2)+divides[2])]<-modindex$level[which(modindex$modlevel== sm3)]
+        dfpoints$level[(rank(data[,mod])/length(data[,mod]))<ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4]) & (rank(data[,mod])/length(data[,mod]))>=ecdf(scale(data[,mod]))(as.numeric(input$sm3)+divides[3])]<-modindex$level[which(modindex$modlevel== sm4)]
+        dfpoints$level[(rank(data[,mod])/length(data[,mod]))>ecdf(scale(data[,mod]))(as.numeric(input$sm4)+divides[4])]<-modindex$level[which(modindex$modlevel== sm5)]
         
         dfpoints<-na.omit(dfpoints)
         
-        dfpoints$level <- factor(dfpoints$level, levels = c(modlevel[[1]]$level[1],
-                                                            modlevel[[2]]$level[1],
-                                                            modlevel[[3]]$level[1],
-                                                            modlevel[[4]]$level[1],
-                                                            modlevel[[5]]$level[1]))
+        dfpoints$level <- factor(dfpoints$level, levels = c(modindex$level[which(modindex$modlevel== sm1)],
+                                                            modindex$level[which(modindex$modlevel== sm2)],
+                                                            modindex$level[which(modindex$modlevel== sm3)],
+                                                            modindex$level[which(modindex$modlevel== sm4)],
+                                                            modindex$level[which(modindex$modlevel== sm5)]))
         
-        df.staticplot$level <- factor(df.staticplot$level, levels = c(modlevel[[1]]$level[1],
-                                                                      modlevel[[2]]$level[1],
-                                                                      modlevel[[3]]$level[1],
-                                                                      modlevel[[4]]$level[1],
-                                                                      modlevel[[5]]$level[1]))
+        df.staticplot$level <- factor(df.staticplot$level, levels = c(modindex$level[which(modindex$modlevel== sm1)],
+                                                                      modindex$level[which(modindex$modlevel== sm2)],
+                                                                      modindex$level[which(modindex$modlevel== sm3)],
+                                                                      modindex$level[which(modindex$modlevel== sm4)],
+                                                                      modindex$level[which(modindex$modlevel== sm5)]))
         
+}
+else{
+  dfpoints$modlevel<-data[,mod]
+  modindex$scalelevel<-c(mod.seq[1],mod.seq[2])
+  dfpoints$level[dfpoints$modlevel==mod.seq[1]]<-modindex$level[which(modindex$scalelevel==mod.seq[1])]
+  dfpoints$level[dfpoints$modlevel==mod.seq[2]]<-modindex$level[which(modindex$scalelevel==mod.seq[2])]
+  dfpoints<-na.omit(dfpoints)
+}
         
         values$dfpoints<-dfpoints
         
@@ -844,21 +802,28 @@ observeEvent(input$go, { #Once the "go" button is hit, InterActive looks at all 
         df.cols$greycolslight<-sapply(df.cols$greycol, function(i) {df.cols$greycol<- lighten(i,pct=0.50)})
         df.cols<-as.data.frame(df.cols)
         values$df.cols<-df.cols
+
+
+# End data display code ---------------------------------------------------
+
+        #Specify a small multiples graphic based on the estimated point estimates and confidence regions (df.staticplot) as well as the observed data (dfpoints).
+        staticplot<-interactiv.plot(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
         
-        staticplot<-interactiv.plot2(data=data,dfpoints=dfpoints,plotdf = df.staticplot)
-        
+        #Define a glyph of the crossover point if it exists within the observed data
         if(values$co <= max(df.staticplot$focal.seq) & values$co >= min(df.staticplot$focal.seq))
         {
           staticplot <- staticplot +
             annotate("point", x = values$co, y =
-                       (m$coefficients["(Intercept)"] + values$co*m$coefficients[foc]),
+                       (df.staticplot[which(df.staticplot$focal.seq == values$co),"pe"]),
                      color= "black", fill = brewer.pal(9,"Greys")[2], size = 2, shape = 23)
         }
         
         values$plot<-staticplot; staticplot
-      }#end of else statement for defining static plots
+      # }#end of else statement for defining static plots
       # }#End of else statement defining continuous moderator static plot
   })#signifies end of output$modplot
+  
+#Read the above-defined elements into output in Shiny
   output$results <- renderTable({
     if (is.null(input$file1))
       return(NULL)
@@ -917,13 +882,6 @@ output$plotdata <- renderTable({
   values$dfplot
 })
 
-output$test.tab <- renderPrint({
-  if (is.null(input$file1))
-    return(NULL)
-  values$ppoints
-  
-})
-
 output$rostest <- renderTable({
   if (is.null(input$file1))
     return(NULL)
@@ -937,6 +895,9 @@ output$rosplot <- renderPlot({
   values$rosplot
 })
 
+#Creates plot outputs of a customized small multiples plot
+
+#Customized marginal effects plot
 output$plot.final.ros <- renderPlot({
   if (is.null(values$rosplot))
     return(NULL)
@@ -948,6 +909,7 @@ output$plot.final.ros <- renderPlot({
   plotfinal.ros
 })
 
+#Customized small multiples plot
 output$plot.final <- renderPlot({
   if (is.null(input$file1))
     return(NULL)
