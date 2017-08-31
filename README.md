@@ -40,9 +40,9 @@ Each multiple corresponds with a particular level of the moderator. By default, 
 
 Users may use these customization options to ready this plot for use in a manuscript. Clicking the “Download Plot” button will output a .png file.
 
-##Additional Functions in interActive
+## Additional Functions in interActive
 
-###Examine the marginal effects plot.
+### Examine the marginal effects plot.
 
 Click on the “Marginal Effects Plot” tab to view a depiction of the regions of significance analyses. Note that this plot displays standardized versions of X and Z predictor variables. Customization options for this plot are provided on this tab as well, and users can download this plot using the “Download Marginal Effects Plot” button below the graphic.
 
