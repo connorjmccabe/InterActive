@@ -1,6 +1,9 @@
 #Figure 3: uncertainty by sample size
-n500<-na.omit(read.csv("/Users/cmccabe/Dropbox/InterActive Project/plot_estimates_n500_mvnorm.csv"))
 require(RCurl)
+require(ggplot2)
+require(RColorBrewer)
+require(gridExtra)
+n500<-na.omit(read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/plot_estimates_n500_mvnorm.csv"),header=T))
 df150all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/figure3_uncertainty_plotestimates_n150.csv"), header=T)
 df500all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/figure3_uncertainty_plotestimates_n500.csv"), header=T)
 
@@ -47,12 +50,10 @@ lp2<-lp + scale_linetype_discrete(name = element_blank(),
 
 mylegend1<-g_legend(lp2)
 
-require(ggplot2)
-require(RColorBrewer)
 plot.n150<-ggplot() + 
   #Specifies confidence intervals referencing the lower and upper CI values
   geom_ribbon(data=n150, aes(x=focal.seq, ymin = lower, ymax = upper, fill=level), alpha = .25) +
-
+  
   scale_colour_manual(values=rep("black",2)) +
   scale_fill_manual(values=rep(lighten("black"),2)) +
   # 
@@ -94,7 +95,7 @@ plot.n500<-ggplot() +
                      labels = c("-2 SD","-1 SD", "Mean", "1 SD", "2 SD")) +
   ggtitle("3b: n = 500") +
   theme(
-      text = element_text("Helvetica"),
+    text = element_text("Helvetica"),
     panel.grid.minor = element_blank(), 
     panel.grid.major = element_line(colour="#CDCDCD",size=0.25),
     panel.background = element_rect(fill = "transparent",colour = "black")) +
@@ -103,7 +104,6 @@ plot.n500<-ggplot() +
 
 plot.n500
 
-require(gridExtra)
 grid.arrange(plot.n150 + theme(text = element_text("Helvetica"),legend.position="none"),
              plot.n500 + theme(text = element_text("Helvetica"),legend.position="none"),
              mylegend1,
