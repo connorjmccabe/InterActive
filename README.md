@@ -22,7 +22,7 @@ Acceptable file types are .csv, .xls, .xlsx, and .sav (SPSS data files).
 
 The model being estimated is *Y = X + Z + XZ*. This model can be specified in interActive using the dropdown menus provided (e.g., see below).
 
-![alt text](https://github.com/connorjmccabe/InterActive/blob/master/Picture2.png)
+![alt text](https://github.com/connorjmccabe/InterActive/blob/master/image%20files/Picture2.png)
 
 Note that X and Z are centered and Y is untransformed (raw) by default, though multiple scaling options are available. No covariates or quadratic effects will be specified in the current example.
 
@@ -32,13 +32,13 @@ This will generate a summary table of coefficients, conduct regions of significa
 
 ### Step 4: Adjust the values of each small multiple as desired.
 
-![alt text](https://github.com/connorjmccabe/InterActive/blob/master/Picture3.png)
+![alt text](https://github.com/connorjmccabe/InterActive/blob/master/image%20files/Picture3.png)
 
 Each multiple corresponds with a particular level of the moderator. By default, these range from -2 to 2 standard deviations because this will generally be representative of the moderator range given the moderator is approximately normal. However, we encourage you to modify these values to explore this functionality. Once small multiple values are decided upon, proceed to step 5 to customize the plot.
 
 ### Step 5: Click on the “Customize Plot” tab to change axes and plot titles, select the “greyscale” option, and download the finalized plot.
 
-![alt text](https://github.com/connorjmccabe/InterActive/blob/master/Picture4.png)
+![alt text](https://github.com/connorjmccabe/InterActive/blob/master/image%20files/Picture4.png)
 
 Users may use these customization options to ready this plot for use in a manuscript. Clicking the “Download Plot” button will output a .png file.
 
@@ -68,4 +68,4 @@ yexpXZ = Xexp + Zexp + Xexp*Zexp
 
 The screenshot below depicts the dropdown menu options for producing this graphic:
 
-![alt text](https://github.com/connorjmccabe/InterActive/blob/master/Picture5.png)
+![alt text](https://github.com/connorjmccabe/InterActive/blob/master/image%20files/Picture5.png)
