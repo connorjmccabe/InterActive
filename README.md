@@ -16,7 +16,7 @@ Before proceeding, be sure to download this data file to your local computer for
 
 Acceptable file types are .csv, .xls, .xlsx, and .sav (SPSS data files).
 
-![alt text](https://github.com/connorjmccabe/InterActive/blob/master/Picture1.png)
+![alt text](https://github.com/connorjmccabe/InterActive/blob/master/image%20files/Picture1.png)
 
 ### Step 2: Select your focal, moderator, and dependent variables using the dropdown menus.
 
