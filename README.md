@@ -8,7 +8,7 @@ https://connorjmccabe.shinyapps.io/interactive/
 
 The following steps for using interActive are based on a simulated dataset of 150 observations. These data are provided in the GitHub repository, or accessible directly for download at the link below:
 
-https://raw.githubusercontent.com/connorjmccabe/InterActive/master/ex1_n150_AMPPS.csv
+https://raw.githubusercontent.com/connorjmccabe/InterActive/master/Simulated%20Data/ex1_n150_AMPPS.csv
 
 Before proceeding, be sure to download this data file to your local computer for upload to the interActive application.
 
