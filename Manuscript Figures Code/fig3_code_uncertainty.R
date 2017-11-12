@@ -109,6 +109,6 @@ fig3<-grid.arrange(plot.n150 + theme(text = element_text("Helvetica", size = 10)
              mylegend1,
              nrow=1, widths = c(9, 9, 4))
 
-ggsave("/Users/cmccabe/Dropbox/InterActive Project/OLS_AMPPS/Manuscript/figures in PDF/fig3.pdf",fig3,width = 7, height = 4, units = "in")
+ggsave("fig3.pdf",fig3,width = 7, height = 4, units = "in")
 
 
