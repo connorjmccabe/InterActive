@@ -3,9 +3,9 @@ require(RCurl)
 require(ggplot2)
 require(RColorBrewer)
 require(gridExtra)
-n500<-na.omit(read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/plot_estimates_n500_mvnorm.csv"),header=T))
-df150all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/figure3_uncertainty_plotestimates_n150.csv"), header=T)
-df500all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/figure3_uncertainty_plotestimates_n500.csv"), header=T)
+n500<-na.omit(read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/Simulated%20Data/ex1_n150_AMPPS.csv"),header=T))
+df150all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/Manuscript%20Figures%20Code/figure3_uncertainty_plotestimates_n150.csv"), header=T)
+df500all<-read.csv(text=getURL("https://raw.githubusercontent.com/connorjmccabe/InterActive/master/Manuscript%20Figures%20Code/figure3_uncertainty_plotestimates_n500.csv"), header=T)
 
 n150<-df150all[which(startsWith(as.character(df150all$level), "-1 SD")==TRUE| startsWith(as.character(df150all$level), "1 SD")==TRUE),]
 n500<-df500all[which(startsWith(as.character(df500all$level), "-1 SD")==TRUE| startsWith(as.character(df500all$level), "1 SD")==TRUE),]
@@ -58,7 +58,7 @@ plot.n150<-ggplot() +
   scale_fill_manual(values=rep(lighten("black"),2)) +
   # 
   #Include fit lines
-  geom_line(data = n150, aes(x=focal.seq, y=pe,color=level, linetype = level), size=1) +
+  geom_line(data = n150, aes(x=focal.seq, y=pe,color=level, linetype = level), size=.75) +
   scale_linetype_manual(values = c("dashed","solid")) +
   ylab("Y") +
   xlab("") +
@@ -68,7 +68,7 @@ plot.n150<-ggplot() +
                      labels = c("-2 SD","-1 SD", "Mean", "1 SD", "2 SD")) +
   ggtitle("3a: n = 150") +
   theme(
-    text = element_text("Helvetica"),
+    text = element_text("Helvetica", size = 10),
     panel.grid.minor = element_blank(), 
     panel.grid.major = element_line(colour="#CDCDCD",size=0.25),
     panel.background = element_rect(fill = "transparent",colour = "black")) +
@@ -85,7 +85,7 @@ plot.n500<-ggplot() +
   scale_fill_manual(values=rep(lighten("black"),2)) +
   # 
   #Include fit lines
-  geom_line(data = n500, aes(x=focal.seq, y=pe,color=level, linetype = level), size=1) +
+  geom_line(data = n500, aes(x=focal.seq, y=pe,color=level, linetype = level), size=.75) +
   scale_linetype_manual(values = c("dashed","solid")) +
   ylab("Y") +
   xlab("") +
@@ -95,7 +95,7 @@ plot.n500<-ggplot() +
                      labels = c("-2 SD","-1 SD", "Mean", "1 SD", "2 SD")) +
   ggtitle("3b: n = 500") +
   theme(
-    text = element_text("Helvetica"),
+    text = element_text("Helvetica", size = 11),
     panel.grid.minor = element_blank(), 
     panel.grid.major = element_line(colour="#CDCDCD",size=0.25),
     panel.background = element_rect(fill = "transparent",colour = "black")) +
@@ -104,8 +104,11 @@ plot.n500<-ggplot() +
 
 plot.n500
 
-grid.arrange(plot.n150 + theme(text = element_text("Helvetica"),legend.position="none"),
-             plot.n500 + theme(text = element_text("Helvetica"),legend.position="none"),
+fig3<-grid.arrange(plot.n150 + theme(text = element_text("Helvetica", size = 10),legend.position="none"),
+             plot.n500 + theme(text = element_text("Helvetica", size = 10),legend.position="none"),
              mylegend1,
-             nrow=1, widths = c(8, 8, 3))
+             nrow=1, widths = c(9, 9, 4))
+
+ggsave("/Users/cmccabe/Dropbox/InterActive Project/OLS_AMPPS/Manuscript/figures in PDF/fig3.pdf",fig3,width = 7, height = 4, units = "in")
+
 

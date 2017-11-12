@@ -194,20 +194,25 @@ plot.quad
 plot3a<-plot.mvnorm + ylim(-100,200) + 
   ggtitle("4a") + theme(text = element_text("Helvetica", size = 10)) +
   theme(legend.position="none",
-        text=element_text("Helvetica", size = 10))
+        text=element_text("Helvetica", size = 6),
+        plot.title = element_text(size = 11))
 
 plot3b<-plot.XZexp + ylim(-100,200) + 
-  ggtitle("4b") + theme(text = element_text("Helvetica", size = 10)) +
+  ggtitle("4b") +
   theme(legend.position="none",
-        text=element_text("Helvetica", size = 10))
+        text=element_text("Helvetica", size = 6),
+        plot.title = element_text(size = 11))
 
-plot3c<-plot.quad + 
-  ylim(-100,200) + 
+plot3c<-plot.quad + ylim(-100,200) + 
   ggtitle("4c") + theme(text = element_text("Helvetica", size = 10)) +
   theme(legend.position="none",
-        text=element_text("Helvetica", size = 10))
+        text=element_text("Helvetica", size = 6),
+        plot.title = element_text(size = 11))
 
 require(gridExtra)
 plot3final<-grid.arrange(arrangeGrob(
-  plot3a,plot3b,plot3c,mylegend1, nrow = 1, widths = c(8,8,8,4)),
+  plot3a,plot3b,plot3c,mylegend1, nrow = 1, widths = c(6,6,6,4)),
   mylegend2, nrow=2,heights=c(8, 1))
+
+ggsave("/Users/cmccabe/Dropbox/InterActive Project/OLS_AMPPS/Manuscript/figures in PDF/fig4.pdf",plot3final,width = 7, height = 4, units = "in")
+
