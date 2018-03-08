@@ -2,7 +2,8 @@
 
 #R Code
 
-#NOTE: the ggplot2 package must be installed for this example.
+#NOTE: the ggplot2 package must be installed for this example. E.g.,
+#install.packages("ggplot2")
 
 #Equations 2 and 3, in matrix algebra form
 #values for x and y, n = 5
