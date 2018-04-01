@@ -1,8 +1,12 @@
 # InterActive
 
-The following are instructions for using the interActive data visualization application to analyze and create graphics. The application is located at the following link:
+The following are instructions for using the interActive data visualization application. We designed this application to help researchers analyze, create graphics for, and ultimately better understand interaction effects. The application is located at the following link:
 
 https://connorjmccabe.shinyapps.io/interactive/
+
+Please be sure to read the accompanying manuscript before using this application. You can find an OnlineFirst version of this manuscript on the webpage for the new APS journal, Advances in Methods and Practices in Psychological Science:
+
+http://journals.sagepub.com/doi/full/10.1177/2515245917746792
 
 ## Using Interactive: Example
 
